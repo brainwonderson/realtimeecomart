@@ -26,7 +26,7 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await fetch('http://localhost:4000/api/auth/login', {
+      const res = await fetch('https://api.wonderson.site/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -48,7 +48,7 @@ export default function Login() {
   async function handleGoogleCredential(response) {
     setGoogleLoading(true)
     try {
-      const res = await fetch('http://localhost:4000/api/auth/google', {
+      const res = await fetch('https://api.wonderson.site/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: response.credential })
