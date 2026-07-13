@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
-const GOOGLE_CLIENT_ID = '658151003144-hg2k7qc22vrsk8fbrba3fdq1h1eond34.apps.googleusercontent.com'
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 export default function Register() {
   const [name, setName] = useState('')

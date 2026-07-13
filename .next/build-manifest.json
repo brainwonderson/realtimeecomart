@@ -32,6 +32,11 @@
       "static/chunks/main.js",
       "static/chunks/pages/dashboard/buyer.js"
     ],
+    "/dashboard/seller": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/dashboard/seller.js"
+    ],
     "/login": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",

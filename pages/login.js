@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Head from 'next/head'
 
-const GOOGLE_CLIENT_ID = '658151003144-hg2k7qc22vrsk8fbrba3fdq1h1eond34.apps.googleusercontent.com'
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 export default function Login() {
   const [email, setEmail] = useState('')
