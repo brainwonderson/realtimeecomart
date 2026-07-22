@@ -6,10 +6,10 @@ const pool = require('../lib/db');
 router.get('/:userId', async (req, res) => {
   const userId = req.params.userId;
   try {
-    const [rows] = await pool.query(
-      'SELECT c.id, c.product_id, c.quantity, c.selected_color, c.selected_size, COALESCE(p.title, CONCAT("Product #", c.product_id)) AS title, COALESCE(p.price, 0) AS price, COALESCE(p.image, "") AS image, COALESCE(p.category, "") AS category FROM carts c LEFT JOIN products p ON p.id = c.product_id WHERE c.user_id = ? ORDER BY c.created_at DESC',
-      [userId]
-    );
+  const [rows] = await pool.query(
+    "SELECT c.id, c.product_id, c.quantity, c.selected_color, c.selected_size, COALESCE(p.title, CONCAT('Product #', c.product_id)) AS title, COALESCE(p.price, 0) AS price, COALESCE(p.image, '') AS image, COALESCE(p.category, '') AS category FROM carts c LEFT JOIN products p ON p.id = c.product_id WHERE c.user_id = ? ORDER BY c.created_at DESC",
+    [userId]
+  );
     res.json(rows);
   } catch (err) {
     console.error(err);
