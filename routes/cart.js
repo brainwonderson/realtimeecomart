@@ -19,26 +19,40 @@ router.get('/:userId', async (req, res) => {
 
 router.post('/:userId', async (req, res) => {
   const userId = req.params.userId;
+
+  console.log("USER ID:", userId);
+  console.log("BODY:", req.body);
+
   const { productId, quantity = 1, selectedColor = null, selectedSize = null } = req.body;
+
   try {
-    // upsert (match on product_id AND variant color AND variant size)
     const [existing] = await pool.query(
-      'SELECT id, quantity FROM carts WHERE user_id = ? AND product_id = ? AND COALESCE(selected_color, "") = COALESCE(?, "") AND COALESCE(selected_size, "") = COALESCE(?, "")',
+      "SELECT id, quantity FROM carts WHERE user_id = ? AND product_id = ? AND COALESCE(selected_color, '') = COALESCE(?, '') AND COALESCE(selected_size, '') = COALESCE(?, '')",
       [userId, productId, selectedColor, selectedSize]
     );
-    
+
     if (existing.length) {
-      await pool.query('UPDATE carts SET quantity = ? WHERE id = ?', [existing[0].quantity + quantity, existing[0].id]);
+      await pool.query(
+        'UPDATE carts SET quantity = ? WHERE id = ?',
+        [existing[0].quantity + quantity, existing[0].id]
+      );
     } else {
       await pool.query(
         'INSERT INTO carts (user_id, product_id, quantity, selected_color, selected_size) VALUES (?,?,?,?,?)',
         [userId, productId, quantity, selectedColor, selectedSize]
       );
     }
+
     res.json({ ok: true });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error:err.message, code: err.code, sql: err.sql});
+
+    res.status(500).json({
+      error: err.message,
+      code: err.code,
+      sql: err.sql
+    });
   }
 });
 
