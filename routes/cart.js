@@ -38,7 +38,7 @@ router.post('/:userId', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'server' });
+    res.status(500).json({ error:err.message, code: err.code, sql: err.sql});
   }
 });
 
