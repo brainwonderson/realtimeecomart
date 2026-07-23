@@ -15,6 +15,8 @@ const navItems = [
   { label: 'Kategori ▾', href: '/#categories' },
 ]
 
+const POPULAR_SEARCHES = ['Sepatu Sneaker', 'Jaket Varsity', 'Kaos Oversize', 'Laptop Gaming', 'Smartwatch']
+
 export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas, Lebih Cepat.' }) {
   const [user, setUser] = useState(null)
   const [q, setQ] = useState('')
@@ -22,10 +24,59 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
   const [showDropdown, setShowDropdown] = useState(false)
   const [isSugLoading, setIsSugLoading] = useState(false)
   const [sugFetched, setSugFetched] = useState(false)
+  const [history, setHistory] = useState([])
   const debounceRef = useRef(null)
   const dropdownRef = useRef(null)
   const inputRef = useRef(null)
   const router = useRouter()
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('search_history')
+      if (stored) {
+        try {
+          setHistory(JSON.parse(stored))
+        } catch (e) {
+          console.error('Error loading search history:', e)
+        }
+      }
+    }
+  }, [])
+
+  const addToHistory = (query) => {
+    const trimmed = query.trim()
+    if (!trimmed) return
+    setHistory(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== trimmed.toLowerCase())
+      const updated = [trimmed, ...filtered].slice(0, 5) // keep up to 5 items
+      localStorage.setItem('search_history', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  const clearAllHistory = () => {
+    localStorage.removeItem('search_history')
+    setHistory([])
+  }
+
+  const removeHistoryItem = (itemToRemove, e) => {
+    e.stopPropagation()
+    setHistory(prev => {
+      const updated = prev.filter(item => item !== itemToRemove)
+      localStorage.setItem('search_history', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  function selectHistory(item) {
+    setQ(item)
+    setShowDropdown(false)
+    addToHistory(item)
+    const params = new URLSearchParams()
+    params.set('q', item)
+    router.push('/' + (params.toString() ? `?${params.toString()}` : ''))
+  }
   const userId = getStoredUserId()
   const { data: cartItems, mutate: mutateCart } = useSWR(userId ? `/cart/${userId}` : null, fetcher)
 
@@ -160,9 +211,15 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
   function submitSearch(e) {
     e.preventDefault()
     setShowDropdown(false)
-    const params = new URLSearchParams()
-    if (q.trim()) params.set('q', q.trim())
-    router.push('/' + (params.toString() ? `?${params.toString()}` : ''))
+    const trimmed = q.trim()
+    if (trimmed) {
+      addToHistory(trimmed)
+      const params = new URLSearchParams()
+      params.set('q', trimmed)
+      router.push('/' + (params.toString() ? `?${params.toString()}` : ''))
+    } else {
+      router.push('/')
+    }
   }
 
   function selectSuggestion(product) {
@@ -173,9 +230,13 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
 
   function searchAll() {
     setShowDropdown(false)
-    const params = new URLSearchParams()
-    if (q.trim()) params.set('q', q.trim())
-    router.push('/' + (params.toString() ? `?${params.toString()}` : ''))
+    const trimmed = q.trim()
+    if (trimmed) {
+      addToHistory(trimmed)
+      const params = new URLSearchParams()
+      params.set('q', trimmed)
+      router.push('/' + (params.toString() ? `?${params.toString()}` : ''))
+    }
   }
 
   return (
@@ -184,7 +245,7 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
       <div className="topbar-info">
         <div className="topbar-info-left">
           <span className="topbar-info-badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm-1 14l-4-4 1.41-1.41L11 13.17l6.59-6.58L19 8l-8 8z"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm-1 14l-4-4 1.41-1.41L11 13.17l6.59-6.58L19 8l-8 8z" /></svg>
             100% Aman
           </span>
           <span className="topbar-info-badge">🚚 Gratis Ongkir min. belanja 50K</span>
@@ -220,7 +281,8 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
             ref={inputRef}
             value={q}
             onChange={e => setQ(e.target.value)}
-            onFocus={() => { if (q.trim()) setShowDropdown(true) }}
+            onFocus={() => setShowDropdown(true)}
+            onClick={() => setShowDropdown(true)}
             placeholder="Cari produk, brand, atau kategori..."
             aria-label="Search products"
             aria-autocomplete="list"
@@ -228,63 +290,139 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
             autoComplete="off"
           />
           <button type="submit" className="topbar-search-btn" aria-label="Cari">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
           </button>
 
-          {/* ── Autocomplete Dropdown ── */}
+          {/* ── Autocomplete & Search History Dropdown ── */}
           {showDropdown && (
             <div ref={dropdownRef} className="search-dropdown" role="listbox" aria-label="Hasil pencarian">
-              {isSugLoading && (
-                <div className="search-dropdown-loading">
-                  <span className="search-loading-spinner" />
-                  <span>Mencari produk...</span>
-                </div>
-              )}
-
-              {!isSugLoading && sugFetched && suggestions.length === 0 && (
-                <div className="search-dropdown-empty">
-                  <div className="search-empty-icon">🔍</div>
-                  <div className="search-empty-text">
-                    <strong>Produk tidak ditemukan</strong>
-                    <span>Tidak ada produk untuk &ldquo;<em>{q}</em>&rdquo;</span>
-                  </div>
-                </div>
-              )}
-
-              {!isSugLoading && suggestions.length > 0 && (
+              {/* ── Search History & Popular Searches (Shown when query is empty) ── */}
+              {!q.trim() && (
                 <>
-                  <div className="search-dropdown-label">Hasil untuk &ldquo;{q}&rdquo;</div>
-                  {suggestions.map(product => (
-                    <button
-                      key={product.id}
-                      type="button"
-                      className="search-suggestion-item"
-                      onClick={() => selectSuggestion(product)}
-                      role="option"
-                    >
-                      <div className="search-sug-img">
-                        {product.image
-                          ? <img src={product.image} alt={product.title} />
-                          : <span>📦</span>
-                        }
+                  {/* Recent Searches */}
+                  {history.length > 0 && (
+                    <>
+                      <div className="search-history-header">
+                        <span className="search-dropdown-label-history">Pencarian Terbaru</span>
+                        <button
+                          type="button"
+                          className="search-history-clear-all"
+                          onClick={clearAllHistory}
+                        >
+                          Hapus Semua
+                        </button>
                       </div>
-                      <div className="search-sug-info">
-                        <span className="search-sug-title">{product.title}</span>
-                        <span className="search-sug-price">
-                          Rp {Number(product.price || 0).toLocaleString('id-ID')}
-                          {product.category && <em className="search-sug-cat">&nbsp;· {product.category}</em>}
-                        </span>
+                      <div className="search-history-list" style={{ marginBottom: 6 }}>
+                        {history.map((item, index) => (
+                          <div
+                            key={index}
+                            className="search-history-item"
+                            onClick={() => selectHistory(item)}
+                          >
+                            <span className="search-history-icon">🕒</span>
+                            <span className="search-history-text">{item}</span>
+                            <button
+                              type="button"
+                              className="search-history-delete"
+                              onClick={(e) => removeHistoryItem(item, e)}
+                              aria-label={`Hapus ${item}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <svg className="search-sug-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="search-dropdown-show-all"
-                    onClick={searchAll}
-                  >
-                    Lihat semua hasil untuk &ldquo;{q}&rdquo; →
-                  </button>
+                    </>
+                  )}
+
+                  {/* Popular Searches */}
+                  <div className="search-dropdown-label" style={{ paddingTop: 10, borderBottom: 'none' }}>Pencarian Populer</div>
+                  <div className="popular-searches-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: '10px 16px 16px' }}>
+                    {POPULAR_SEARCHES.map((item, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="popular-search-tag"
+                        onClick={() => selectHistory(item)}
+                        style={{
+                          background: 'var(--bg-elevated, #252840)',
+                          border: '1px solid var(--border, rgba(255, 255, 255, 0.1))',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                          color: 'var(--text-primary, #f0f4f8)',
+                          fontSize: 12,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 150ms',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <span style={{ color: 'var(--orange-light, #fb923c)', fontWeight: 'bold' }}>#{index + 1}</span>
+                        <span className="popular-search-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ── Autocomplete Suggestions (Shown when query is not empty) ── */}
+              {q.trim() !== '' && (
+                <>
+                  {isSugLoading && (
+                    <div className="search-dropdown-loading">
+                      <span className="search-loading-spinner" />
+                      <span>Mencari produk...</span>
+                    </div>
+                  )}
+
+                  {!isSugLoading && sugFetched && suggestions.length === 0 && (
+                    <div className="search-dropdown-empty">
+                      <div className="search-empty-icon">🔍</div>
+                      <div className="search-empty-text">
+                        <strong>Produk tidak ditemukan</strong>
+                        <span>Tidak ada produk untuk &ldquo;<em>{q}</em>&rdquo;</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isSugLoading && suggestions.length > 0 && (
+                    <>
+                      <div className="search-dropdown-label">Hasil untuk &ldquo;{q}&rdquo;</div>
+                      {suggestions.map(product => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className="search-suggestion-item"
+                          onClick={() => selectSuggestion(product)}
+                          role="option"
+                        >
+                          <div className="search-sug-img">
+                            {product.image
+                              ? <img src={product.image} alt={product.title} />
+                              : <span>📦</span>
+                            }
+                          </div>
+                          <div className="search-sug-info">
+                            <span className="search-sug-title">{product.title}</span>
+                            <span className="search-sug-price">
+                              Rp {Number(product.price || 0).toLocaleString('id-ID')}
+                              {product.category && <em className="search-sug-cat">&nbsp;· {product.category}</em>}
+                            </span>
+                          </div>
+                          <svg className="search-sug-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="search-dropdown-show-all"
+                        onClick={searchAll}
+                      >
+                        Lihat semua hasil untuk &ldquo;{q}&rdquo; →
+                      </button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -294,7 +432,7 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
         {/* Right side */}
         <div className="topbar-right">
           <Link href="/cart" className="cart-button" aria-label="Keranjang belanja">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
             <span className="cart-badge" aria-label={`${cartCount} item`}>{cartCount}</span>
           </Link>
 
@@ -438,7 +576,7 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
       {/* ── Category Nav ── */}
       <nav className="category-nav" aria-label="Navigasi kategori">
         <button className="category-nav-hamburger" type="button" aria-label="Menu semua kategori">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           Semua Kategori
         </button>
         <div className="category-nav-sep" />

@@ -7,7 +7,7 @@ import { getStoredUserId } from '../lib/session'
 import SiteNav from '../components/SiteNav'
 import { authJson } from '../lib/clientApi'
 
-const pageSize = 12
+const pageSize = 15
 
 const popularCategories = [
   { icon: '💻', label: 'Elektronik' },
@@ -56,6 +56,7 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [chatState, setChatState] = useState('idle')
+  const [isChatWidgetOpen, setIsChatWidgetOpen] = useState(false)
   const chatEndRef = useRef(null)
 
   // New Search & Store states
@@ -1107,7 +1108,7 @@ export default function Home() {
                   )}
                 </>
               ) : (
-                <div className="empty-state--large">
+                            <div className="empty-state--large">
                   <div className="empty-state-icon">🔍</div>
                   <strong style={{ color: 'var(--text-primary)', fontSize: '18px' }}>
                     Tidak ada produk ditemukan
@@ -1147,10 +1148,13 @@ export default function Home() {
             </div>
 
           </main>
+        </div>
+      )}
 
-          {/* ── CHAT SIDEBAR ── */}
-          <aside className="chat-sidebar" aria-label="EcoMart Assistant">
-
+      {/* ── FLOATING CHATBOT WIDGET (Shopee Style) ── */}
+      <div className="floating-chat-container">
+        {isChatWidgetOpen && (
+          <div className="floating-chat-window">
             {chatOpen ? (
               <div className="chat-assistant-card">
                 <div className="chat-assistant-header" style={{ justifyContent: 'space-between' }}>
@@ -1161,24 +1165,43 @@ export default function Home() {
                       <div className="chat-online-dot">Online</div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setChatOpen(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: 20,
-                      cursor: 'pointer',
-                      color: 'var(--text-secondary)',
-                      padding: 4,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    aria-label="Tutup Chat"
-                  >
-                    ✕
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setChatOpen(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        padding: '4px 8px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px'
+                      }}
+                      title="Kembali ke Menu Utama"
+                    >
+                      ↩ Menu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsChatWidgetOpen(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: 20,
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        padding: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      aria-label="Tutup Chat"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mobile-chat-body" style={{ overflowY: 'auto', maxHeight: '320px', display: 'flex', flexDirection: 'column' }}>
@@ -1223,12 +1246,32 @@ export default function Home() {
               </div>
             ) : (
               <div className="chat-assistant-card">
-                <div className="chat-assistant-header">
-                  <div className="chat-assistant-avatar">🤖</div>
-                  <div className="chat-assistant-info">
-                    <strong>EcoMart Assistant</strong>
-                    <div className="chat-online-dot">Online</div>
+                <div className="chat-assistant-header" style={{ justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="chat-assistant-avatar">🤖</div>
+                    <div className="chat-assistant-info">
+                      <strong>EcoMart Assistant</strong>
+                      <div className="chat-online-dot">Online</div>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsChatWidgetOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: 20,
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary)',
+                      padding: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    aria-label="Tutup Chat"
+                  >
+                    ✕
+                  </button>
                 </div>
 
                 <div className="chat-assistant-greeting">
@@ -1260,72 +1303,17 @@ export default function Home() {
                 </button>
               </div>
             )}
-
-            {!chatOpen && (
-              <div className="mobile-chat-preview">
-                <div className="mobile-chat-preview-header">
-                  <span className="mobile-preview-title">Tampilan Mobile (Chat Assistant)</span>
-                  <span className="mobile-preview-badge">Preview</span>
-                </div>
-                <div className="mobile-chat-body">
-                  <div className="chat-bubble chat-bubble--user">
-                    <div className="chat-bubble-msg">
-                      Saya cari laptop untuk desain grafis budget 10 juta
-                    </div>
-                    <span className="chat-bubble-time">09:41</span>
-                  </div>
-
-                  <div className="chat-bubble chat-bubble--bot">
-                    <div className="chat-bubble-avatar">🤖</div>
-                    <div>
-                      <div className="chat-bubble-msg">
-                        Baik! Saya menemukan beberapa laptop terbaik untuk kebutuhan desain grafis dengan budget 10 juta. Berikut rekomendasinya 👇
-                      </div>
-                      <div className="chat-product-recs">
-                        {[
-                          { name: 'ASUS Vivobook Pro 15 OLED', price: 'Rp 9.999.000' },
-                          { name: 'Lenovo IdeaPad Slim 5', price: 'Rp 9.499.000' },
-                          { name: '+3 Lainnya', price: '' },
-                        ].map((rec, i) => (
-                          <div key={i} className="chat-product-rec">
-                            <div style={{ width: 60, height: 50, background: 'var(--bg-primary)', borderRadius: 6, display: 'grid', placeItems: 'center', fontSize: 20 }}>
-                              {i === 0 ? '💻' : i === 1 ? '🖥️' : '📦'}
-                            </div>
-                            <strong>{rec.name}</strong>
-                            {rec.price && <span>{rec.price}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mobile-chat-input">
-                  <input type="text" placeholder="Ketik pesan..." readOnly aria-label="Chat input preview" />
-                  <button className="mobile-chat-send" type="button" aria-label="Kirim pesan">➤</button>
-                </div>
-              </div>
-            )}
-
-            {/* Benefits */}
-            <div className="benefits-section">
-              <p className="benefits-title">🌟 Keuntungan Belanja di EcoMart</p>
-              <div className="benefits-list">
-                {benefits.map((b, i) => (
-                  <div key={i} className="benefit-item">
-                    <div className="benefit-icon">{b.icon}</div>
-                    <div className="benefit-text">
-                      <strong>{b.title}</strong>
-                      <p>{b.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </aside>
-        </div>
-      )}
+          </div>
+        )}
+        <button
+          className="floating-chat-trigger"
+          onClick={() => setIsChatWidgetOpen(!isChatWidgetOpen)}
+          aria-label="Tanya EcoMart Assistant"
+        >
+          <span className="chat-trigger-icon">💬</span>
+          <span className="chat-trigger-text">Chat</span>
+        </button>
+      </div>
     </div>
   )
 }
