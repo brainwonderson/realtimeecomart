@@ -6,6 +6,7 @@ const multer = require('multer');
 const pool = require('../lib/db');
 const { verifyToken, requireRole } = require('../lib/auth');
 const { checkAndApplyPromos, revertPromoPrices } = require('../utils/promoManager');
+const { uploadFileToCloudinary, uploadBase64ToCloudinary } = require('../utils/cloudinary');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -41,22 +42,7 @@ async function storeProductMedia(mediaValue, req) {
   if (!mediaValue || typeof mediaValue !== 'string') return mediaValue || '';
   if (!mediaValue.startsWith('data:image/') && !mediaValue.startsWith('data:video/')) return mediaValue;
 
-  const matches = mediaValue.match(/^data:(image\/[a-zA-Z0-9.+-]+|video\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!matches) return '';
-
-  const mimeType = matches[1];
-  const base64Content = matches[2].replace(/\s/g, '');
-  const extensionMap = {
-    'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
-    'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
-    'video/mp4': 'mp4', 'video/webm': 'webm', 'video/ogg': 'ogg', 'video/quicktime': 'mov'
-  };
-  const extension = extensionMap[mimeType] || 'png';
-  const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
-
-  await fs.mkdir(uploadsDir, { recursive: true });
-  await fs.writeFile(path.join(uploadsDir, fileName), Buffer.from(base64Content, 'base64'));
-  return `${req.protocol}://${req.get('host')}/uploads/${fileName}`;
+  return await uploadBase64ToCloudinary(mediaValue);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -204,7 +190,7 @@ router.post('/products', verifyToken, requireRole('SELLER', 'ADMIN'), async (req
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
@@ -257,7 +243,7 @@ router.patch('/products/:id', verifyToken, requireRole('SELLER', 'ADMIN'), async
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
@@ -387,13 +373,18 @@ router.post('/banners', verifyToken, requireRole('SELLER', 'ADMIN'), uploadBanne
   if (!req.file) return res.status(400).json({ error: 'image required' });
   if (!SELLER_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
   try {
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const imageUrl = await uploadFileToCloudinary(req.file.path);
+    await fs.unlink(req.file.path).catch(err => console.error('Error deleting temp file:', err));
+
     const [result] = await pool.query(
       'INSERT INTO promo_banners (title, type, seller_id, image, link_url, is_active) VALUES (?,?,?,?,?,?)',
       [title, type, req.user.id, imageUrl, link_url || null, Number(is_active)]
     );
     res.json({ ok: true, id: result.insertId });
   } catch (err) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
     console.error(err);
     res.status(500).json({ error: 'server' });
   }
@@ -405,8 +396,19 @@ router.patch('/banners/:id', verifyToken, requireRole('SELLER', 'ADMIN'), upload
   if (type && !SELLER_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
   try {
     const [existing] = await pool.query('SELECT id FROM promo_banners WHERE id = ? AND seller_id = ?', [req.params.id, req.user.id]);
-    if (!existing.length) return res.status(404).json({ error: 'Banner tidak ditemukan' });
-    const imageUrl = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
+    if (!existing.length) {
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+      }
+      return res.status(404).json({ error: 'Banner tidak ditemukan' });
+    }
+    
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = await uploadFileToCloudinary(req.file.path);
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
+
     await pool.query(
       `UPDATE promo_banners SET
         title     = COALESCE(?, title),
@@ -419,6 +421,9 @@ router.patch('/banners/:id', verifyToken, requireRole('SELLER', 'ADMIN'), upload
     );
     res.json({ ok: true });
   } catch (err) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
     console.error(err);
     res.status(500).json({ error: 'server' });
   }

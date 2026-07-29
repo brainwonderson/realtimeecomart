@@ -2,9 +2,11 @@ const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
+const fs = require('fs/promises');
 const pool = require('../lib/db');
 const { verifyToken, requireRole } = require('../lib/auth');
 const { revertExpiredFlashSales } = require('../utils/flashSaleReverter');
+const { uploadFileToCloudinary } = require('../utils/cloudinary');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -139,13 +141,18 @@ router.post('/banners', verifyToken, requireRole('ADMIN'), upload.single('image'
   if (!req.file) return res.status(400).json({ error: 'image required' });
   if (!ADMIN_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
   try {
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const imageUrl = await uploadFileToCloudinary(req.file.path);
+    await fs.unlink(req.file.path).catch(err => console.error('Error deleting temp file:', err));
+
     const [result] = await pool.query(
       'INSERT INTO promo_banners (title, type, seller_id, image, link_url, is_active) VALUES (?,?,NULL,?,?,?)',
       [title, type, imageUrl, link_url || null, Number(is_active)]
     );
     res.json({ ok: true, id: result.insertId });
   } catch (err) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
     console.error(err);
     res.status(500).json({ error: 'server' });
   }
@@ -156,8 +163,19 @@ router.patch('/banners/:id', verifyToken, requireRole('ADMIN'), upload.single('i
   if (type && !ADMIN_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
   try {
     const [existing] = await pool.query('SELECT id FROM promo_banners WHERE id = ? AND seller_id IS NULL', [req.params.id]);
-    if (!existing.length) return res.status(404).json({ error: 'Banner tidak ditemukan' });
-    const imageUrl = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
+    if (!existing.length) {
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+      }
+      return res.status(404).json({ error: 'Banner tidak ditemukan' });
+    }
+    
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = await uploadFileToCloudinary(req.file.path);
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
+
     await pool.query(
       `UPDATE promo_banners SET
         title     = COALESCE(?, title),
@@ -170,6 +188,9 @@ router.patch('/banners/:id', verifyToken, requireRole('ADMIN'), upload.single('i
     );
     res.json({ ok: true });
   } catch (err) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    }
     console.error(err);
     res.status(500).json({ error: 'server' });
   }
