@@ -6,6 +6,8 @@ import { useRouter } from 'next/router'
 import { getStoredUserId } from '../lib/session'
 import SiteNav from '../components/SiteNav'
 import { authJson } from '../lib/clientApi'
+import Head from 'next/head'
+
 
 const pageSize = 15
 
@@ -462,6 +464,11 @@ export default function Home() {
 
   return (
     <div>
+      <Head>
+        <title>EcoMart - Toko Online Murah & Terpercaya</title>
+        <meta name='description' content='EcoMart adalah toko online murah dan terpercaya dengan berbagai produk berkualitas dan harga terbaik.' />
+        <meta name='keywords' content='toko online murah, belanja online, ecommerce Indonesia, EcoMart' />
+      </Head>
       <SiteNav />
 
       {isSearching ? (
