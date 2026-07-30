@@ -316,7 +316,7 @@ export default function ProductPage() {
             </div>
 
             {/* Harga */}
-            <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 10, background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.15)' }}>
+            <div style={{ marginBottom: 20, padding: '14px 16px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
               {item.original_price && Number(item.original_price) > Number(item.price) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 14, color: 'var(--text-muted)', textDecoration: 'line-through' }}>

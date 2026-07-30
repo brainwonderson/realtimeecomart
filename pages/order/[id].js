@@ -99,7 +99,7 @@ export default function OrderConfirmation() {
               <h2>Pesanan tidak ditemukan</h2>
               <p className="muted">{error || 'Detail pesanan belum tersedia.'}</p>
               {id ? <p className="muted">Referensi: #{id}</p> : null}
-              <Link className="button" href="/dashboard/buyer">Lihat pesanan saya</Link>
+              <Link className="button" href="/dashboard/buyer?tab=orders">Lihat pesanan saya</Link>
             </div>
           ) : (
             <>
@@ -108,7 +108,14 @@ export default function OrderConfirmation() {
                 <div>
                   <p className="muted">Nomor pesanan</p>
                   <h2 className="order-number">#{order.id}</h2>
-                  <p>Status: <strong>{order.status}</strong> · Pembayaran: <strong>{order.payment_status}</strong></p>
+                  <p>
+                    Status: <strong style={{ textTransform: 'uppercase' }}>{order.status}</strong> · 
+                    Pembayaran: <strong>
+                      {order.payment_status === 'pending'
+                        ? (order.payment_receipt ? 'Menunggu Konfirmasi Penjual' : 'Belum Dibayar')
+                        : order.payment_status === 'paid' ? 'LUNAS' : order.payment_status.toUpperCase()}
+                    </strong>
+                  </p>
                 </div>
               </div>
 
@@ -118,6 +125,14 @@ export default function OrderConfirmation() {
                   <span className="muted">Metode pembayaran</span>
                   <strong>{paymentLabel}</strong>
                 </div>
+                {order.payment_receipt && (
+                  <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                    <span className="muted">Bukti Pembayaran</span>
+                    <a href={order.payment_receipt} target="_blank" rel="noopener noreferrer">
+                      <img src={order.payment_receipt} alt="Bukti Transfer" style={{ maxWidth: 180, maxHeight: 180, borderRadius: 8, border: '1px solid var(--border)', marginTop: 4, objectFit: 'contain' }} />
+                    </a>
+                  </div>
+                )}
                 <div className="summary-row">
                   <span className="muted">Subtotal Produk</span>
                   <strong>Rp {subtotal.toLocaleString('id-ID')}</strong>
@@ -161,7 +176,7 @@ export default function OrderConfirmation() {
               ) : null}
 
               <div className="checkout-actions">
-                <Link className="button" href="/dashboard/buyer">Lihat pesanan saya</Link>
+                <Link className="button" href="/dashboard/buyer?tab=orders">Lihat pesanan saya</Link>
                 <Link className="ghost-button" href="/">Lanjut belanja</Link>
               </div>
             </>

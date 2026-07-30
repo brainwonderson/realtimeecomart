@@ -24,6 +24,7 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('qris')
   const [submitting, setSubmitting] = useState(false)
   const [snapStatus, setSnapStatus] = useState(null) // null | 'opening' | 'pending'
+  const [receiptFile, setReceiptFile] = useState(null)
 
   // Promo & Voucher state
   const [promoPreview, setPromoPreview] = useState(null)
@@ -118,6 +119,10 @@ export default function Checkout() {
 
   async function placeOrder() {
     if (!userId || !validateAddress()) return
+    if (paymentMethod === 'qris' && !receiptFile) {
+      alert('Bukti pembayaran QRIS wajib diunggah untuk konfirmasi.')
+      return
+    }
     setSubmitting(true)
     setSnapStatus(null)
 
@@ -134,7 +139,8 @@ export default function Checkout() {
           address: fullAddress,
           paymentMethod,
           shippingOption,
-          voucherCode: appliedVoucherCode || null
+          voucherCode: appliedVoucherCode || null,
+          paymentReceipt: paymentMethod === 'qris' ? receiptFile : null
         }),
       })
 
@@ -322,7 +328,12 @@ export default function Checkout() {
               <h3>Metode pembayaran</h3>
               <p className="muted">Pilih cara pembayaran untuk pesanan ini.</p>
 
-              <PaymentMethodPicker value={paymentMethod} onChange={setPaymentMethod} />
+              <PaymentMethodPicker 
+                value={paymentMethod} 
+                onChange={setPaymentMethod} 
+                receiptPreview={receiptFile}
+                onReceiptChange={setReceiptFile}
+              />
 
               <div className="checkout-review panel stack">
                 <h4>Ringkasan singkat</h4>

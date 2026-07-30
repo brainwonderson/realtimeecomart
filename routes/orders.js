@@ -4,6 +4,7 @@ const pool = require('../lib/db');
 const { verifyToken, requireRole } = require('../lib/auth');
 const midtransClient = require('midtrans-client');
 const crypto = require('crypto');
+const { uploadBase64ToCloudinary } = require('../utils/cloudinary');
 
 // ── Midtrans Snap client ───────────────────────────────────────────────────
 const snap = new midtransClient.Snap({
@@ -217,7 +218,7 @@ router.get('/detail/:orderId', verifyToken, async (req, res) => {
 // ── POST /checkout/:userId — buat order + Midtrans Snap token ──────────────
 router.post('/checkout/:userId', verifyToken, async (req, res) => {
   const userId = req.params.userId;
-  const { address, paymentMethod = 'qris', shippingOption = 'standard', voucherCode = null } = req.body;
+  const { address, paymentMethod = 'qris', shippingOption = 'standard', voucherCode = null, paymentReceipt = null } = req.body;
   const allowedPayments = ['qris', 'transfer', 'cod', 'dummy'];
   const normalizedPayment = allowedPayments.includes(paymentMethod) ? paymentMethod : 'qris';
 
@@ -232,10 +233,20 @@ router.post('/checkout/:userId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: totals.voucherError });
     }
 
+    let uploadedReceiptUrl = null;
+    if (normalizedPayment === 'qris' && paymentReceipt) {
+      try {
+        uploadedReceiptUrl = await uploadBase64ToCloudinary(paymentReceipt, 'receipts');
+      } catch (uploadErr) {
+        console.error('Failed to upload payment receipt:', uploadErr);
+        return res.status(500).json({ error: 'Gagal mengunggah bukti pembayaran' });
+      }
+    }
+
     // 2. Buat order di DB
     const [o] = await pool.query(
-      `INSERT INTO orders (user_id, address, status, payment_status, payment_method, total_amount, discount_amount, shipping_cost, voucher_code) 
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO orders (user_id, address, status, payment_status, payment_method, total_amount, discount_amount, shipping_cost, voucher_code, payment_receipt) 
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [
         userId, 
         address || '', 
@@ -245,7 +256,8 @@ router.post('/checkout/:userId', verifyToken, async (req, res) => {
         totals.grandTotal, 
         totals.discountAmount, 
         totals.finalShippingCost, 
-        totals.appliedVoucher ? totals.appliedVoucher.code : null
+        totals.appliedVoucher ? totals.appliedVoucher.code : null,
+        uploadedReceiptUrl
       ]
     );
     const orderId = o.insertId;
@@ -282,62 +294,88 @@ router.post('/checkout/:userId', verifyToken, async (req, res) => {
     let snapToken = null;
     let snapRedirectUrl = null;
 
-    try {
-      // Ambil info user untuk customer_details
-      const [users] = await pool.query('SELECT name, email FROM users WHERE id = ?', [userId]);
-      const user = users[0] || {};
-
-      const itemDetails = totals.cartItems.map(it => ({
-        id: String(it.product_id),
-        price: Math.round(it.price),
-        quantity: it.quantity,
-        name: (it.title || 'Produk').substring(0, 50),
-      }));
-
-      if (Number(totals.finalShippingCost) > 0) {
-        itemDetails.push({
-          id: 'SHIPPING',
-          price: Math.round(Number(totals.finalShippingCost)),
-          quantity: 1,
-          name: `Ongkir ${totals.shippingLabel}`,
-        });
-      }
-
-      if (totals.discountAmount > 0) {
-        itemDetails.push({
-          id: 'DISCOUNT',
-          price: -Math.round(totals.discountAmount),
-          quantity: 1,
-          name: 'Diskon Promo Platform',
-        });
-      }
-
-      const snapParameter = {
-        transaction_details: {
-          order_id: `ORDER-${orderId}-${Date.now()}`,
-          gross_amount: Math.round(totals.grandTotal),
-        },
-        customer_details: {
-          first_name: user.name || 'Customer',
-          email: user.email || 'customer@example.com',
-        },
-        item_details: itemDetails,
-        enabled_payments: ['qris', 'bank_transfer', 'bca_va', 'bni_va', 'bri_va', 'other_va'],
-      };
-
-      const snapResponse = await snap.createTransaction(snapParameter);
-      snapToken = snapResponse.token;
-      snapRedirectUrl = snapResponse.redirect_url;
-
-      // Simpan snap order_id ke DB agar webhook bisa mencocokkan
+    if (normalizedPayment !== 'qris' || !uploadedReceiptUrl) {
       try {
-        await pool.query('UPDATE orders SET midtrans_order_id = ? WHERE id = ?', [snapParameter.transaction_details.order_id, orderId]);
-      } catch (_) {
-        // kolom belum ada, tidak fatal
+        // Ambil info user untuk customer_details
+        const [users] = await pool.query('SELECT name, email FROM users WHERE id = ?', [userId]);
+        const user = users[0] || {};
+
+        const itemDetails = totals.cartItems.map(it => ({
+          id: String(it.product_id),
+          price: Math.round(it.price),
+          quantity: it.quantity,
+          name: (it.title || 'Produk').substring(0, 50),
+        }));
+
+        if (Number(totals.finalShippingCost) > 0) {
+          itemDetails.push({
+            id: 'SHIPPING',
+            price: Math.round(Number(totals.finalShippingCost)),
+            quantity: 1,
+            name: `Ongkir ${totals.shippingLabel}`,
+          });
+        }
+
+        if (totals.discountAmount > 0) {
+          itemDetails.push({
+            id: 'DISCOUNT',
+            price: -Math.round(totals.discountAmount),
+            quantity: 1,
+            name: 'Diskon Promo Platform',
+          });
+        }
+
+        const snapParameter = {
+          transaction_details: {
+            order_id: `ORDER-${orderId}-${Date.now()}`,
+            gross_amount: Math.round(totals.grandTotal),
+          },
+          customer_details: {
+            first_name: user.name || 'Customer',
+            email: user.email || 'customer@example.com',
+          },
+          item_details: itemDetails,
+          enabled_payments: ['qris', 'bank_transfer', 'bca_va', 'bni_va', 'bri_va', 'other_va'],
+        };
+
+        const snapResponse = await snap.createTransaction(snapParameter);
+        snapToken = snapResponse.token;
+        snapRedirectUrl = snapResponse.redirect_url;
+
+        // Simpan snap order_id ke DB agar webhook bisa mencocokkan
+        try {
+          await pool.query('UPDATE orders SET midtrans_order_id = ? WHERE id = ?', [snapParameter.transaction_details.order_id, orderId]);
+        } catch (_) {
+          // kolom belum ada, tidak fatal
+        }
+      } catch (midtransErr) {
+        console.error('[Midtrans] Snap token error:', midtransErr.message || midtransErr);
+        // Order sudah dibuat, kembalikan tanpa snapToken — frontend bisa handle gracefully
       }
-    } catch (midtransErr) {
-      console.error('[Midtrans] Snap token error:', midtransErr.message || midtransErr);
-      // Order sudah dibuat, kembalikan tanpa snapToken — frontend bisa handle gracefully
+    } else {
+      // Jika bayar QRIS manual, buat history bahwa bukti pembayaran telah diupload
+      try {
+        await pool.query(
+          'INSERT INTO order_status_history (order_id, status, note, created_by) VALUES (?,?,?,?)',
+          [orderId, 'pending', 'Bukti pembayaran QRIS telah diunggah. Menunggu konfirmasi penjual.', Number(userId)]
+        );
+        
+        // Kirim notifikasi ke penjual
+        const [sellers] = await pool.query(
+          'SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?',
+          [orderId]
+        );
+        for (const s of sellers) {
+          if (s.seller_id) {
+            await pool.query(
+              "INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'seller_order')",
+              [s.seller_id, 'Verifikasi Pembayaran QRIS', `Pesanan baru #${orderId} telah mengirimkan bukti transfer QRIS. Silakan verifikasi pembayaran.`, 'seller_order']
+            );
+          }
+        }
+      } catch (notifErr) {
+        console.error('Failed to create manual payment history or notifications:', notifErr);
+      }
     }
 
     res.json({ ok: true, orderId, snapToken, snapRedirectUrl });
@@ -448,6 +486,19 @@ router.get('/:userId', verifyToken, async (req, res) => {
       'SELECT id, status, payment_status, payment_method, tracking_number, cancel_reason, total_amount, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC',
       [userId]
     );
+
+    // Fetch items for each order
+    for (let order of orders) {
+      const [items] = await pool.query(
+        `SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.selected_color, oi.selected_size, p.title, p.image, p.category
+         FROM order_items oi
+         JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = ?`,
+        [order.id]
+      );
+      order.items = items;
+    }
+
     res.json(orders);
   } catch (err) {
     console.error(err);
@@ -540,6 +591,12 @@ router.patch('/:orderId/status', verifyToken, requireRole('SELLER', 'ADMIN'), as
 
     let queryStr = 'UPDATE orders SET status = ?';
     const params = [status];
+    if (status === 'diproses') {
+      queryStr += ", payment_status = 'paid'";
+    } else if (status === 'dibatalkan') {
+      queryStr += ", payment_status = 'failed'";
+    }
+    
     if (tracking_number !== null) {
       queryStr += ', tracking_number = ?';
       params.push(tracking_number);
@@ -632,6 +689,31 @@ router.post('/:orderId/receive', verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server' });
+  }
+});
+
+// DELETE /:orderId — delete order permanently (seller/admin)
+router.delete('/:orderId', verifyToken, requireRole('SELLER', 'ADMIN'), async (req, res) => {
+  const orderId = req.params.orderId;
+  try {
+    if (req.user.role !== 'ADMIN') {
+      const [items] = await pool.query(
+        'SELECT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?',
+        [orderId]
+      );
+      if (items.length > 0 && String(items[0].seller_id) !== String(req.user.id)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+    }
+
+    await pool.query('DELETE FROM order_items WHERE order_id = ?', [orderId]);
+    await pool.query('DELETE FROM order_status_history WHERE order_id = ?', [orderId]);
+    await pool.query('DELETE FROM orders WHERE id = ?', [orderId]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error: ' + err.message });
   }
 });
 

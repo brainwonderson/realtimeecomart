@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import SiteNav from '../../components/SiteNav'
 import { authJson } from '../../lib/clientApi'
 import { getStoredUser } from '../../lib/session'
@@ -228,12 +229,23 @@ function BukaTokoFlow({ onSuccess, onCancel }) {
    BUYER DASHBOARD — Main Component
    ══════════════════════════════════════════════════════════════ */
 export default function BuyerDashboard() {
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [addresses, setAddresses] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('profile')
+  const [tab, setTab] = useState('orders')
+
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      setTab(router.query.tab)
+    }
+  }, [router.isReady, router.query.tab])
+
+  // Tracking states
+  const [expandedTracking, setExpandedTracking] = useState({}) // { [orderId]: historyData }
+  const [loadingTracking, setLoadingTracking] = useState({}) // { [orderId]: boolean }
 
   // Chat states
   const [chatRooms, setChatRooms] = useState([])
@@ -406,6 +418,24 @@ export default function BuyerDashboard() {
       alert('Pesanan berhasil diterima! Terima kasih.')
     } catch (err) {
       alert('Gagal menyelesaikan pesanan: ' + (err.message || err))
+    }
+  }
+
+  async function toggleTracking(orderId) {
+    if (expandedTracking[orderId]) {
+      setExpandedTracking(prev => ({ ...prev, [orderId]: null }));
+      return;
+    }
+
+    setLoadingTracking(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const history = await authJson(`/orders/${orderId}/history`);
+      setExpandedTracking(prev => ({ ...prev, [orderId]: history || [] }));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal memuat pelacakan: ' + (err.message || err));
+    } finally {
+      setLoadingTracking(prev => ({ ...prev, [orderId]: false }));
     }
   }
 
@@ -685,17 +715,206 @@ export default function BuyerDashboard() {
                     <p className="muted" style={{ fontSize: 13, margin: '4px 0' }}>Payment: {order.payment_status} | Method: {order.payment_method || 'dummy'}</p>
                     <p className="price" style={{ fontSize: 14, fontWeight: 700, margin: '4px 0' }}>Rp {Number(order.total_amount).toLocaleString('id-ID')}</p>
                     
+                    {/* Daftar item produk */}
+                    {order.items && order.items.length > 0 && (
+                      <div className="order-items-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: '14px 0', padding: '12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                        {order.items.map((item, idx) => (
+                          <div key={item.id || idx} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            <img
+                              src={item.image || '/placeholder-product.png'}
+                              alt={item.title}
+                              style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                              <p className="muted" style={{ margin: '2px 0 0', fontSize: 11 }}>
+                                {item.quantity} x Rp {Number(item.unit_price).toLocaleString('id-ID')}
+                                {(item.selected_color || item.selected_size) && (
+                                  <span style={{ marginLeft: 8, color: 'var(--accent)', fontWeight: 600 }}>
+                                    (
+                                    {item.selected_color && <span>Warna: {item.selected_color}</span>}
+                                    {item.selected_color && item.selected_size && <span>, </span>}
+                                    {item.selected_size && <span>Ukuran: {item.selected_size}</span>}
+                                    )
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {order.tracking_number && (
                       <div style={{ margin: '8px 0', fontSize: 12, padding: '6px 10px', background: 'var(--bg-elevated)', borderRadius: 6, border: '1px solid var(--border)' }}>
                         🚚 <strong>Resi Pengiriman:</strong> {order.tracking_number}
                       </div>
                     )}
 
+                    {order.status === 'dibatalkan' ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        color: 'var(--red)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        fontSize: 12,
+                        marginTop: 12
+                      }}>
+                        <span>❌</span>
+                        <div>
+                          <strong>Pesanan Dibatalkan</strong>
+                          {order.cancel_reason && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>Alasan: {order.cancel_reason}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Stepper Progress */
+                      <div className="order-stepper" style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        position: 'relative',
+                        margin: '20px 0 12px',
+                        padding: '0 8px'
+                      }}>
+                        {/* Connecting line */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '12px',
+                          left: '24px',
+                          right: '24px',
+                          height: '3px',
+                          background: 'var(--border)',
+                          zIndex: 1
+                        }} />
+                        {/* Active line */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '12px',
+                          left: '24px',
+                          height: '3px',
+                          background: 'linear-gradient(90deg, #3b82f6, #10b981)',
+                          width: `${
+                            order.status === 'selesai' ? '100%' :
+                            order.status === 'dikirim' ? '66%' :
+                            (order.status === 'diproses' || order.payment_status === 'paid') ? '33%' : '0%'
+                          }`,
+                          transition: 'width 0.3s ease',
+                          zIndex: 2
+                        }} />
+
+                        {/* Steps */}
+                        {[
+                          { key: 'dipesan', label: order.payment_status === 'paid' ? 'Sudah Bayar' : 'Dipesan', icon: '📝', active: true },
+                          { key: 'dikemas', label: 'Dikemas', icon: '📦', active: order.payment_status === 'paid' || ['diproses', 'dikirim', 'selesai'].includes(order.status) },
+                          { key: 'dikirim', label: 'Dikirim', icon: '🚚', active: ['dikirim', 'selesai'].includes(order.status) },
+                          { key: 'selesai', label: 'Selesai', icon: '✓', active: order.status === 'selesai' }
+                        ].map((step, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            zIndex: 3,
+                            width: '60px',
+                            textAlign: 'center'
+                          }}>
+                            {/* Circle dot */}
+                            <div style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              background: step.active ? '#10b981' : 'var(--bg-elevated)',
+                              border: step.active ? '2px solid #10b981' : '2px solid var(--border)',
+                              color: step.active ? '#fff' : 'var(--text-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              transition: 'all 0.3s ease',
+                              boxShadow: step.active ? '0 0 8px rgba(16,185,129,0.4)' : 'none'
+                            }}>
+                              {step.icon}
+                            </div>
+                            <span style={{
+                              fontSize: '10px',
+                              marginTop: '6px',
+                              fontWeight: step.active ? 'bold' : 'normal',
+                              color: step.active ? 'var(--text-primary)' : 'var(--text-muted)'
+                            }}>
+                              {step.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="stack" style={{ marginTop: 10 }}>
-                      <button className="ghost-button" onClick={async () => {
-                        const history = await authJson(`/orders/${order.id}/history`)
-                        alert(history.map(h => `${new Date(h.created_at).toLocaleString('id-ID')}: [${h.status.toUpperCase()}] ${h.note || ''}`).join('\n') || 'Belum ada tracking')
-                      }} style={{ fontSize: 12 }}>Lihat tracking</button>
+                      <button className="ghost-button" onClick={() => toggleTracking(order.id)} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
+                        🧭 {expandedTracking[order.id] ? 'Tutup Detail Pelacakan' : 'Lacak Pesanan'}
+                        {loadingTracking[order.id] && ' (⏳)'}
+                      </button>
+                      
+                      {/* Detail Pelacakan (Timeline Vertikal) */}
+                      {expandedTracking[order.id] && (
+                        <div className="tracking-timeline-box" style={{
+                          marginTop: '12px',
+                          padding: '16px',
+                          background: 'var(--bg-elevated)',
+                          borderRadius: '12px',
+                          border: '1px solid var(--border)',
+                          textAlign: 'left'
+                        }}>
+                          <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            📋 Detail Log Pelacakan
+                          </h4>
+                          
+                          {expandedTracking[order.id].length === 0 ? (
+                            <p className="muted" style={{ fontSize: '12px', margin: 0 }}>Belum ada log pelacakan untuk pesanan ini.</p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', paddingLeft: '14px', borderLeft: '2px dashed var(--border)' }}>
+                              {expandedTracking[order.id].map((historyItem, idx) => {
+                                const isLast = idx === expandedTracking[order.id].length - 1;
+                                return (
+                                  <div key={idx} style={{
+                                    position: 'relative',
+                                    paddingBottom: isLast ? '0' : '16px',
+                                    fontSize: '12px'
+                                  }}>
+                                    {/* Dot indicator */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      left: '-20px',
+                                      top: '4px',
+                                      width: '10px',
+                                      height: '10px',
+                                      borderRadius: '50%',
+                                      background: isLast ? '#10b981' : 'var(--text-muted)',
+                                      border: isLast ? '2px solid rgba(16,185,129,0.3)' : '2px solid var(--border)',
+                                      boxShadow: isLast ? '0 0 6px #10b981' : 'none'
+                                    }} />
+                                    <div style={{ fontWeight: isLast ? 'bold' : 'normal', color: isLast ? '#10b981' : 'var(--text-primary)' }}>
+                                      {historyItem.status.toUpperCase()}
+                                    </div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>
+                                      {historyItem.note}
+                                    </div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginTop: '4px' }}>
+                                      {new Date(historyItem.created_at).toLocaleString('id-ID', {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short'
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       
                       <div className="row-actions" style={{ marginTop: 8 }}>
                         {isUnpaid && (

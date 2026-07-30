@@ -45,7 +45,7 @@ const METHODS = [
   },
 ]
 
-export default function PaymentMethodPicker({ value = 'qris', onChange }) {
+export default function PaymentMethodPicker({ value = 'qris', onChange, receiptPreview = null, onReceiptChange = null }) {
   return (
     <div>
       <div className="payment-method-grid" role="radiogroup" aria-label="Metode pembayaran">
@@ -107,6 +107,51 @@ export default function PaymentMethodPicker({ value = 'qris', onChange }) {
               <span className="qris-step-num">4</span>
               <span>Konfirmasi nominal & bayar</span>
             </div>
+          </div>
+
+          <div className="qris-upload-section" style={{ marginTop: 16, padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>
+              Upload Bukti Transfer QRIS *
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  if (onReceiptChange) {
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                      onReceiptChange(reader.result)
+                    }
+                    reader.readAsDataURL(file)
+                  }
+                }
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            />
+            {receiptPreview && (
+              <div className="qris-receipt-preview" style={{ marginTop: 10 }}>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Pratinjau Bukti:</p>
+                <img
+                  src={receiptPreview}
+                  alt="Bukti Transfer"
+                  style={{
+                    maxWidth: 150,
+                    maxHeight: 200,
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    objectFit: 'cover'
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

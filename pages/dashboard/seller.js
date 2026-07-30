@@ -114,6 +114,18 @@ export default function SellerDashboard() {
   const [rejectReason, setRejectReason] = useState('')
   const [rejectSaving, setRejectSaving] = useState(false)
 
+  const handleDeleteOrder = async (orderId) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus Pesanan #${orderId} secara PERMANEN dari database? Tindakan ini tidak dapat dibatalkan.`)) {
+      try {
+        await authJson(`/orders/${orderId}`, { method: 'DELETE' })
+        alert('Pesanan berhasil dihapus secara permanen!')
+        await refresh()
+      } catch (err) {
+        alert('Gagal menghapus pesanan: ' + (err.message || err))
+      }
+    }
+  }
+
   /* ─── load user ─── */
   useEffect(() => {
     const u = getStoredUser()
@@ -1028,7 +1040,7 @@ export default function SellerDashboard() {
                   </h3>
 
                   {!store && (
-                    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', fontSize: 13, color: 'var(--orange-light)' }}>
+                    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 13, color: 'var(--orange-light)' }}>
                       ⚠️ Buka toko dulu sebelum menambahkan produk.{' '}
                       <button type="button" onClick={() => setActiveTab('store')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontWeight: 700, padding: 0 }}>
                         Buka Toko →
@@ -1308,7 +1320,7 @@ export default function SellerDashboard() {
                 ) : (
                   orders.map(order => {
                     const isNewOrder = order.status === 'pending' && order.payment_status === 'paid';
-                    const isUnpaid = order.payment_status === 'pending';
+                    const isUnpaid = order.payment_status === 'pending' && !order.payment_receipt;
                     const orderInput = shippingInputs[order.order_id] || { courier: 'JNE', tracking: '' };
                     
                     return (
@@ -1318,15 +1330,48 @@ export default function SellerDashboard() {
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <span className="chip" style={{
                               fontSize: 11,
-                              background: isNewOrder ? 'rgba(59,130,246,0.15)' : 'rgba(100,116,139,0.1)',
-                              color: isNewOrder ? '#2563eb' : 'var(--text-secondary)',
-                              fontWeight: isNewOrder ? 'bold' : 'normal'
+                              background: isNewOrder || (order.status === 'pending' && order.payment_receipt) ? 'rgba(59,130,246,0.15)' : 'rgba(100,116,139,0.1)',
+                              color: isNewOrder || (order.status === 'pending' && order.payment_receipt) ? '#2563eb' : 'var(--text-secondary)',
+                              fontWeight: isNewOrder || (order.status === 'pending' && order.payment_receipt) ? 'bold' : 'normal'
                             }}>
-                              {isNewOrder ? 'Pesanan Baru (Menunggu Dikemas)' : order.status.toUpperCase()}
+                              {isNewOrder || (order.status === 'pending' && order.payment_receipt) ? 'Pesanan Baru (Menunggu Dikemas)' : order.status.toUpperCase()}
                             </span>
-                            <span className="chip" style={{ fontSize: 11, background: order.payment_status === 'paid' ? 'rgba(16,185,129,0.1)' : 'rgba(249,115,22,0.1)', color: order.payment_status === 'paid' ? '#10b981' : 'var(--orange-light)' }}>
-                              {order.payment_status === 'paid' ? 'PAID (Sudah Bayar)' : 'UNPAID (Belum Bayar)'}
+                            <span className="chip" style={{
+                              fontSize: 11,
+                              background: order.payment_status === 'paid'
+                                ? 'rgba(16,185,129,0.1)'
+                                : order.payment_receipt
+                                  ? 'rgba(245,158,11,0.15)'
+                                  : 'rgba(96,165,250,0.1)',
+                              color: order.payment_status === 'paid'
+                                ? '#10b981'
+                                : order.payment_receipt
+                                  ? '#d97706'
+                                  : 'var(--orange-light)'
+                            }}>
+                              {order.payment_status === 'paid'
+                                ? 'PAID (Sudah Bayar)'
+                                : order.payment_receipt
+                                  ? 'Menunggu Konfirmasi QRIS'
+                                  : 'UNPAID (Belum Bayar)'}
                             </span>
+                            <button
+                              onClick={() => handleDeleteOrder(order.order_id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                padding: '2px 6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                marginLeft: 4,
+                              }}
+                              title="Hapus Pesanan Permanen"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </div>
                         <p className="muted" style={{ fontSize: 13, margin: '6px 0' }}>
@@ -1349,12 +1394,46 @@ export default function SellerDashboard() {
                           </div>
                         )}
 
+                        {order.payment_receipt && (
+                          <div style={{ margin: '8px 0', fontSize: 12, padding: '8px 10px', background: 'var(--bg-elevated)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                            🖼️ <strong>Bukti Pembayaran QRIS:</strong>
+                            <div style={{ marginTop: 6 }}>
+                              <a href={order.payment_receipt} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={order.payment_receipt}
+                                  alt="Bukti Transfer QRIS"
+                                  style={{
+                                    maxWidth: 150,
+                                    maxHeight: 150,
+                                    borderRadius: 6,
+                                    border: '1px solid var(--border)',
+                                    cursor: 'zoom-in',
+                                    objectFit: 'contain'
+                                  }}
+                                />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="row-actions" style={{ marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
                           {isUnpaid && (
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>⏳ Menunggu pembayaran dari customer</span>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>⏳ Menunggu pembayaran dari customer</span>
+                              <button 
+                                className="button" 
+                                onClick={() => {
+                                  setRejectOrderId(order.order_id)
+                                  setRejectReason('')
+                                }} 
+                                style={{ fontSize: 11, padding: '6px 12px', background: 'var(--red)', borderColor: 'var(--red)' }}
+                              >
+                                ❌ Batalkan Pesanan
+                              </button>
+                            </div>
                           )}
 
-                          {isNewOrder && (
+                          {(isNewOrder || (order.status === 'pending' && order.payment_receipt)) && (
                             <div style={{ display: 'flex', gap: 10 }}>
                               <button 
                                 className="button" 
@@ -1455,7 +1534,7 @@ export default function SellerDashboard() {
                   </h3>
 
                   {!store && (
-                    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)', fontSize: 13, color: 'var(--orange-light)' }}>
+                    <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 13, color: 'var(--orange-light)' }}>
                       ⚠️ Buka toko dulu sebelum menambahkan banner.
                     </div>
                   )}

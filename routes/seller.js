@@ -315,7 +315,7 @@ router.delete('/products/:id', verifyToken, requireRole('SELLER', 'ADMIN'), asyn
 router.get('/orders', verifyToken, requireRole('SELLER', 'ADMIN'), async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT o.id AS order_id, o.user_id, o.status, o.payment_status, o.total_amount, o.created_at, o.tracking_number,
+      `SELECT o.id AS order_id, o.user_id, o.status, o.payment_status, o.total_amount, o.created_at, o.tracking_number, o.payment_receipt,
               p.id AS product_id, p.title, p.seller_id, oi.quantity, oi.unit_price, oi.selected_color, oi.selected_size
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
