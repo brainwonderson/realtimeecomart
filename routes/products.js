@@ -96,7 +96,7 @@ router.get('/:id', async (req, res) => {
     // Hitung jumlah produk aktif dari toko ini
     if (rows[0].store_id) {
       const [countResult] = await pool.query(
-        'SELECT COUNT(*) AS total_products FROM products WHERE seller_id = ? AND status = "ACTIVE"',
+        "SELECT COUNT(*) AS total_products FROM products WHERE seller_id = ? AND status = 'ACTIVE'",
         [rows[0].seller_id]
       );
       rows[0].store_total_products = countResult[0].total_products;
