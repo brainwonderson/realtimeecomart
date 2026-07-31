@@ -4301,3 +4301,172 @@ a {
   max-height: 320px;
   min-height: 280px;
 }
+
+/* ===================================================
+   RESPONSIVE DESIGN SYSTEM OVERRIDES (MOBILE & TABLET)
+   =================================================== */
+@media (max-width: 640px) {
+  /* Main Topbar Row Alignments */
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px;
+  }
+
+  .brand-link {
+    order: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-logo-wrap {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+    border-radius: 8px;
+  }
+
+  .brand-text span {
+    display: none; /* Hide slogan to make header single-line */
+  }
+
+  .brand-text strong {
+    font-size: 15px;
+  }
+
+  .topbar-right {
+    order: 2;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .nav-link-btn,
+  .nav-register-btn,
+  .profile-button,
+  .cart-button {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+
+  .profile-meta {
+    display: none !important; /* Hide profile name to save space */
+  }
+
+  .nav-avatar {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 11px !important;
+  }
+
+  /* Full Width Search Bar on Row 2 */
+  .topbar-search {
+    order: 3;
+    flex-basis: 100%;
+    width: 100%;
+    margin-top: 4px;
+    height: 38px;
+  }
+
+  .topbar-search-category {
+    display: none !important; /* Hide category dropdown inside search input */
+  }
+
+  .topbar-search input {
+    height: 36px;
+    font-size: 13px;
+    padding: 0 12px;
+  }
+
+  .topbar-search-btn {
+    height: 36px;
+    width: 36px;
+  }
+
+  /* Horizontal Category Nav Scroll */
+  .category-nav-item,
+  .category-nav-hamburger {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  /* Search Tabs / Sorting Scroll */
+  .search-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    width: 100%;
+    gap: 6px;
+    padding-bottom: 2px;
+  }
+
+  .search-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .search-tab {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Search/Category Sidebar Layout Optimization */
+  .search-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+    padding: 12px 12px 48px;
+  }
+
+  .search-sidebar {
+    padding: 14px 16px;
+    gap: 12px;
+    border-radius: 12px;
+  }
+
+  /* Transform vertical category filter list into horizontal swipe list */
+  .category-filter-list {
+    flex-direction: row !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    gap: 6px;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-filter-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .category-filter-list .filter-pill {
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 12px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .category-filter-list .filter-pill span:last-child {
+    display: none !important; /* Hide arrow on mobile horizontal pill */
+  }
+
+  .price-filter-head h3,
+  .filter-group h3 {
+    font-size: 13px;
+    padding-bottom: 4px;
+  }
+  
+  .reset-filter-button {
+    padding: 8px;
+    font-size: 12px;
+  }
+}

@@ -248,12 +248,7 @@ export default function Home() {
   }
 
   function handleCategoryClick(catLabel) {
-    setCategory(catLabel)
-    // Scroll to products section
-    const el = document.getElementById('products')
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    router.push(`/category/${encodeURIComponent(catLabel)}`)
   }
 
   // Chatbot helpers and effects
