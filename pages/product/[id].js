@@ -46,6 +46,50 @@ export default function ProductPage() {
     setUserId(getStoredUserId())
   }, [])
 
+  useEffect(() => {
+    if (product?.image) {
+      setActiveMedia({ url: product.image, type: 'image' })
+    }
+  }, [product])
+
+  // Poll chat messages when chat box is open
+  useEffect(() => {
+    if (!chatOpen || !product?.seller_id || !userId) return
+    let active = true
+
+    async function fetchMessages() {
+      try {
+        const token = getStoredToken()
+        if (!token) return
+        const response = await fetch(`/api/chats/messages/${product.seller_id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active) {
+          setChatMessages(data)
+        }
+      } catch (err) {
+        console.error('Error fetching chat messages:', err)
+      }
+    }
+
+    fetchMessages()
+    const interval = setInterval(fetchMessages, 3000)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [chatOpen, product?.seller_id, userId])
+
+  // Scroll to bottom of chat
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages])
+
   if (error) {
     return (
       <div>
@@ -69,50 +113,6 @@ export default function ProductPage() {
   }
 
   const item = product
-
-  useEffect(() => {
-    if (item?.image) {
-      setActiveMedia({ url: item.image, type: 'image' })
-    }
-  }, [product])
-
-  // Poll chat messages when chat box is open
-  useEffect(() => {
-    if (!chatOpen || !item.seller_id || !userId) return
-    let active = true
-
-    async function fetchMessages() {
-      try {
-        const token = getStoredToken()
-        if (!token) return
-        const response = await fetch(`/api/chats/messages/${item.seller_id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (!response.ok) return
-        const data = await response.json()
-        if (active) {
-          setChatMessages(data)
-        }
-      } catch (err) {
-        console.error('Error fetching chat messages:', err)
-      }
-    }
-
-    fetchMessages()
-    const interval = setInterval(fetchMessages, 3000)
-
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [chatOpen, item.seller_id, userId])
-
-  // Scroll to bottom of chat
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [chatMessages])
 
   const handleOpenChat = () => {
     if (!getStoredUserId()) {
