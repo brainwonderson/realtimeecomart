@@ -3,15 +3,11 @@ const bcrypt = require('bcrypt');
 
 async function seed() {
   try {
-    // Hapus data demo Wireless Headphone jika ada di database
-    await pool.query("DELETE FROM reviews WHERE product_id IN (SELECT id FROM products WHERE title = 'Wireless Headphone')");
-    await pool.query("DELETE FROM products WHERE title = 'Wireless Headphone'");
+    // Hapus data demo jika ada di database
+    await pool.query("DELETE FROM reviews WHERE product_id IN (SELECT id FROM products WHERE title IN ('Wireless Headphone', 'Smart Watch', 'Backpack'))");
+    await pool.query("DELETE FROM products WHERE title IN ('Wireless Headphone', 'Smart Watch', 'Backpack')");
 
-    const products = [
-      { title: 'Smart Watch', description: 'Jam pintar untuk aktivitas harian.', price: 499000, stock: 10, image: 'https://picsum.photos/seed/watch/600/600', category: 'Wearables', sellerEmail: 'seller@demo.com' },
-      { title: 'Backpack', description: 'Tas ransel simple untuk kebutuhan kerja dan kuliah.', price: 199000, stock: 8, image: 'https://picsum.photos/seed/bag/600/600', category: 'Bag', sellerEmail: 'seller@demo.com' }
-    ];
-
+    const products = [];
     for (const p of products) {
       const [sellerRows] = await pool.query('SELECT id FROM users WHERE email = ?', [p.sellerEmail]);
       const sellerId = sellerRows[0] ? sellerRows[0].id : null;

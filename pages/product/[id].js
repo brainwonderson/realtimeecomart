@@ -6,19 +6,6 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import SiteNav from '../../components/SiteNav'
 
-const demoProduct = {
-  id: 2,
-  title: 'Smart Watch',
-  price: 499000,
-  image: 'https://picsum.photos/seed/watch/600/600',
-  description: 'Contoh halaman detail produk untuk menampilkan layout, gambar, deskripsi, dan tombol add to cart.',
-  store_id: null,
-  store_name: null,
-  store_logo: null,
-  store_is_open: null,
-  seller_name: null,
-  store_total_products: 0,
-}
 
 function StarRow({ rating = 5 }) {
   return (
@@ -33,7 +20,7 @@ function StarRow({ rating = 5 }) {
 export default function ProductPage() {
   const router = useRouter()
   const { id } = router.query
-  const { data: product } = useSWR(id ? `/products/${id}` : null, fetcher)
+  const { data: product, error } = useSWR(id ? `/products/${id}` : null, fetcher)
   const [userId, setUserId] = useState(null)
   const [addingToCart, setAddingToCart] = useState(false)
   const [qty, setQty] = useState(1)
@@ -59,7 +46,29 @@ export default function ProductPage() {
     setUserId(getStoredUserId())
   }, [])
 
-  const item = product || demoProduct
+  if (error) {
+    return (
+      <div>
+        <SiteNav subtitle="Detail Produk" />
+        <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh', color: 'var(--red)', fontWeight: 700 }}>
+          <div>Produk tidak ditemukan atau terjadi kesalahan.</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!product) {
+    return (
+      <div>
+        <SiteNav subtitle="Detail Produk" />
+        <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh', color: 'var(--text-muted)' }}>
+          <div>Memuat produk...</div>
+        </div>
+      </div>
+    )
+  }
+
+  const item = product
 
   useEffect(() => {
     if (item?.image) {

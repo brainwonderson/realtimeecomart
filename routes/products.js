@@ -2,11 +2,6 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../lib/db');
 
-const demoProducts = [
-  { id: 2, title: 'Smart Watch',        price: 499000, image: 'https://picsum.photos/seed/watch/400/400',     description: 'Jam pintar untuk aktivitas harian.', category: 'Wearables', seller_id: null, store_name: null, store_id: null },
-  { id: 3, title: 'Backpack',           price: 199000, image: 'https://picsum.photos/seed/bag/400/400',       description: 'Tas ransel simple untuk kebutuhan kerja dan kuliah.', category: 'Bag', seller_id: null, store_name: null, store_id: null }
-];
-
 // GET /api/products — list with search, category filter, sorting
 router.get('/', async (req, res) => {
   const { q, category, sort = 'newest', limit = 40, offset = 0 } = req.query;
@@ -34,7 +29,7 @@ router.get('/', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.json(demoProducts);
+    res.status(500).json({ error: 'server error' });
   }
 });
 
@@ -106,9 +101,7 @@ router.get('/:id', async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error(err);
-    const demo = demoProducts.find(p => String(p.id) === String(id));
-    if (demo) return res.json(demo);
-    res.status(404).json({ error: 'not found' });
+    res.status(500).json({ error: 'server error' });
   }
 });
 
