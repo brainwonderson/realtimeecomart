@@ -7,10 +7,10 @@ import Link from 'next/link'
 import SiteNav from '../../components/SiteNav'
 
 const demoProduct = {
-  id: 1,
-  title: 'Wireless Headphone',
-  price: 299000,
-  image: 'https://picsum.photos/seed/headphone/600/600',
+  id: 2,
+  title: 'Smart Watch',
+  price: 499000,
+  image: 'https://picsum.photos/seed/watch/600/600',
   description: 'Contoh halaman detail produk untuk menampilkan layout, gambar, deskripsi, dan tombol add to cart.',
   store_id: null,
   store_name: null,

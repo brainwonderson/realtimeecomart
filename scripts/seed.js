@@ -3,8 +3,11 @@ const bcrypt = require('bcrypt');
 
 async function seed() {
   try {
+    // Hapus data demo Wireless Headphone jika ada di database
+    await pool.query("DELETE FROM reviews WHERE product_id IN (SELECT id FROM products WHERE title = 'Wireless Headphone')");
+    await pool.query("DELETE FROM products WHERE title = 'Wireless Headphone'");
+
     const products = [
-      { title: 'Wireless Headphone', description: 'Headphone nirkabel dengan kualitas suara jernih.', price: 299000, stock: 15, image: 'https://picsum.photos/seed/headphone/600/600', category: 'Audio', sellerEmail: 'seller@demo.com' },
       { title: 'Smart Watch', description: 'Jam pintar untuk aktivitas harian.', price: 499000, stock: 10, image: 'https://picsum.photos/seed/watch/600/600', category: 'Wearables', sellerEmail: 'seller@demo.com' },
       { title: 'Backpack', description: 'Tas ransel simple untuk kebutuhan kerja dan kuliah.', price: 199000, stock: 8, image: 'https://picsum.photos/seed/bag/600/600', category: 'Bag', sellerEmail: 'seller@demo.com' }
     ];

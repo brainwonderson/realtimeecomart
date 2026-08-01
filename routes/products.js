@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require('../lib/db');
 
 const demoProducts = [
-  { id: 1, title: 'Wireless Headphone', price: 299000, image: 'https://picsum.photos/seed/headphone/400/400', description: 'Headphone nirkabel dengan kualitas suara jernih.', category: 'Audio', seller_id: null, store_name: null, store_id: null },
   { id: 2, title: 'Smart Watch',        price: 499000, image: 'https://picsum.photos/seed/watch/400/400',     description: 'Jam pintar untuk aktivitas harian.', category: 'Wearables', seller_id: null, store_name: null, store_id: null },
   { id: 3, title: 'Backpack',           price: 199000, image: 'https://picsum.photos/seed/bag/400/400',       description: 'Tas ransel simple untuk kebutuhan kerja dan kuliah.', category: 'Bag', seller_id: null, store_name: null, store_id: null }
 ];
