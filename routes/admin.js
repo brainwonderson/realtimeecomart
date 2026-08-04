@@ -97,7 +97,7 @@ router.get('/banners/public', async (req, res) => {
   const type = req.query.type || 'homepage';
   try {
     const [rows] = await pool.query(
-      'SELECT id, title, type, image, link_url FROM promo_banners WHERE is_active = 1 AND seller_id IS NULL AND type = ? ORDER BY created_at DESC',
+      'SELECT id, title, type, image, image_mobile, link_url FROM promo_banners WHERE is_active = 1 AND seller_id IS NULL AND type = ? ORDER BY created_at DESC',
       [type]
     );
     res.json(rows);
@@ -111,7 +111,7 @@ router.get('/banners/public', async (req, res) => {
 router.get('/banners/public/all', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, title, type, image, link_url FROM promo_banners WHERE is_active = 1 AND seller_id IS NULL ORDER BY type, created_at DESC'
+      'SELECT id, title, type, image, image_mobile, link_url FROM promo_banners WHERE is_active = 1 AND seller_id IS NULL ORDER BY type, created_at DESC'
     );
     res.json(rows);
   } catch (err) {
@@ -135,61 +135,92 @@ router.get('/banners', verifyToken, requireRole('ADMIN'), async (req, res) => {
   }
 });
 
-router.post('/banners', verifyToken, requireRole('ADMIN'), upload.single('image'), async (req, res) => {
+router.post('/banners', verifyToken, requireRole('ADMIN'), upload.fields([{ name: 'image', maxCount: 1 }, { name: 'image_mobile', maxCount: 1 }]), async (req, res) => {
   const { title, link_url, is_active = 1, type = 'homepage' } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
-  if (!req.file) return res.status(400).json({ error: 'image required' });
+
+  const imageFile = req.files && req.files['image'] ? req.files['image'][0] : null;
+  const imageMobileFile = req.files && req.files['image_mobile'] ? req.files['image_mobile'][0] : null;
+
+  if (!imageFile) return res.status(400).json({ error: 'image required' });
   if (!ADMIN_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
+
   try {
-    const imageUrl = await uploadFileToCloudinary(req.file.path);
-    await fs.unlink(req.file.path).catch(err => console.error('Error deleting temp file:', err));
+    const imageUrl = await uploadFileToCloudinary(imageFile.path);
+    await fs.unlink(imageFile.path).catch(err => console.error('Error deleting temp file:', err));
+
+    let imageMobileUrl = null;
+    if (imageMobileFile) {
+      imageMobileUrl = await uploadFileToCloudinary(imageMobileFile.path);
+      await fs.unlink(imageMobileFile.path).catch(err => console.error('Error deleting temp file:', err));
+    }
 
     const [result] = await pool.query(
-      'INSERT INTO promo_banners (title, type, seller_id, image, link_url, is_active) VALUES (?,?,NULL,?,?,?)',
-      [title, type, imageUrl, link_url || null, Number(is_active)]
+      'INSERT INTO promo_banners (title, type, seller_id, image, image_mobile, link_url, is_active) VALUES (?,?,NULL,?,?,?,?)',
+      [title, type, imageUrl, imageMobileUrl, link_url || null, Number(is_active)]
     );
     res.json({ ok: true, id: result.insertId });
   } catch (err) {
-    if (req.file) {
-      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    if (imageFile) {
+      await fs.unlink(imageFile.path).catch(e => console.error('Error deleting temp file:', e));
+    }
+    if (imageMobileFile) {
+      await fs.unlink(imageMobileFile.path).catch(e => console.error('Error deleting temp file:', e));
     }
     console.error(err);
     res.status(500).json({ error: 'server' });
   }
 });
 
-router.patch('/banners/:id', verifyToken, requireRole('ADMIN'), upload.single('image'), async (req, res) => {
+router.patch('/banners/:id', verifyToken, requireRole('ADMIN'), upload.fields([{ name: 'image', maxCount: 1 }, { name: 'image_mobile', maxCount: 1 }]), async (req, res) => {
   const { title, link_url, is_active, type } = req.body;
   if (type && !ADMIN_BANNER_TYPES.includes(type)) return res.status(400).json({ error: 'invalid banner type' });
+
+  const imageFile = req.files && req.files['image'] ? req.files['image'][0] : null;
+  const imageMobileFile = req.files && req.files['image_mobile'] ? req.files['image_mobile'][0] : null;
+
   try {
     const [existing] = await pool.query('SELECT id FROM promo_banners WHERE id = ? AND seller_id IS NULL', [req.params.id]);
     if (!existing.length) {
-      if (req.file) {
-        await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+      if (imageFile) {
+        await fs.unlink(imageFile.path).catch(e => console.error('Error deleting temp file:', e));
+      }
+      if (imageMobileFile) {
+        await fs.unlink(imageMobileFile.path).catch(e => console.error('Error deleting temp file:', e));
       }
       return res.status(404).json({ error: 'Banner tidak ditemukan' });
     }
     
     let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadFileToCloudinary(req.file.path);
-      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    if (imageFile) {
+      imageUrl = await uploadFileToCloudinary(imageFile.path);
+      await fs.unlink(imageFile.path).catch(e => console.error('Error deleting temp file:', e));
+    }
+
+    let imageMobileUrl = null;
+    if (imageMobileFile) {
+      imageMobileUrl = await uploadFileToCloudinary(imageMobileFile.path);
+      await fs.unlink(imageMobileFile.path).catch(e => console.error('Error deleting temp file:', e));
     }
 
     await pool.query(
       `UPDATE promo_banners SET
-        title     = COALESCE(?, title),
-        type      = COALESCE(?, type),
-        link_url  = COALESCE(?, link_url),
-        is_active = COALESCE(?, is_active),
-        image     = COALESCE(?, image)
+        title        = COALESCE(?, title),
+        type         = COALESCE(?, type),
+        link_url     = COALESCE(?, link_url),
+        is_active    = COALESCE(?, is_active),
+        image        = COALESCE(?, image),
+        image_mobile = COALESCE(?, image_mobile)
        WHERE id = ?`,
-      [title ?? null, type ?? null, link_url ?? null, is_active != null ? Number(is_active) : null, imageUrl, req.params.id]
+      [title ?? null, type ?? null, link_url ?? null, is_active != null ? Number(is_active) : null, imageUrl, imageMobileUrl, req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
-    if (req.file) {
-      await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+    if (imageFile) {
+      await fs.unlink(imageFile.path).catch(e => console.error('Error deleting temp file:', e));
+    }
+    if (imageMobileFile) {
+      await fs.unlink(imageMobileFile.path).catch(e => console.error('Error deleting temp file:', e));
     }
     console.error(err);
     res.status(500).json({ error: 'server' });
@@ -470,6 +501,48 @@ router.delete('/promos/:id', verifyToken, requireRole('ADMIN'), async (req, res)
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server' });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════
+   CATEGORY MODERATION
+   ══════════════════════════════════════════════════════════════ */
+router.get('/categories', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT c.id, c.name, c.status, c.created_at, u.name AS creator_name
+      FROM categories c
+      LEFT JOIN users u ON u.id = c.created_by
+      ORDER BY c.created_at DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+router.patch('/categories/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  const { status } = req.body;
+  if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
+    return res.status(400).json({ error: 'Status tidak valid' });
+  }
+  try {
+    await pool.query('UPDATE categories SET status = ? WHERE id = ?', [status, req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+router.delete('/categories/:id', verifyToken, requireRole('ADMIN'), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
   }
 });
 

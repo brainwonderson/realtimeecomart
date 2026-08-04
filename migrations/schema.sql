@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('BUYER','SELLER','ADMIN') NOT NULL DEFAULT 'BUYER',
   `is_verified` TINYINT(1) NOT NULL DEFAULT 0,
   `is_banned` TINYINT(1) NOT NULL DEFAULT 0,
+  `avatar` VARCHAR(512) DEFAULT NULL,
+  `phone` VARCHAR(30) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -151,4 +153,22 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   INDEX `idx_notifications_user_id` (`user_id`),
   INDEX `idx_notifications_is_read` (`is_read`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `categories` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL UNIQUE,
+  `status` ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+  `created_by` INT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO `categories` (`name`, `status`) VALUES
+('Elektronik', 'APPROVED'),
+('Fashion', 'APPROVED'),
+('Kecantikan', 'APPROVED'),
+('Rumah Tangga', 'APPROVED'),
+('Olahraga', 'APPROVED'),
+('Makanan', 'APPROVED'),
+('Otomotif', 'APPROVED'),
+('Lainnya', 'APPROVED');
 

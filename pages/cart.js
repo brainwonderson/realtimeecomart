@@ -3,6 +3,7 @@ import useSWR from 'swr'
 import { fetcher } from '../lib/api'
 import Link from 'next/link'
 import SiteNav from '../components/SiteNav'
+import Footer from '../components/Footer'
 import OrderSummary from '../components/OrderSummary'
 import { getStoredToken, getStoredUserId } from '../lib/session'
 
@@ -167,6 +168,7 @@ export default function Cart(){
           <p className="footer-note">Checkout multi-langkah: alamat, pengiriman, dan pembayaran.</p>
         </OrderSummary>
       </div>
+      <Footer />
     </div>
   )
 }

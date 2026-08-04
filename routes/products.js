@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../lib/db');
+const { verifyToken } = require('../lib/auth');
 
 // GET /api/products — list with search, category filter, sorting
 router.get('/', async (req, res) => {
@@ -17,7 +18,12 @@ router.get('/', async (req, res) => {
       WHERE p.status = 'ACTIVE'
     `;
     const params = [];
-    if (q) { sql += ' AND (p.title LIKE ? OR p.description LIKE ?)'; params.push('%' + q + '%', '%' + q + '%'); }
+    if (q) {
+      const escapedQ = q.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regexPattern = `\\b${escapedQ}\\b`;
+      sql += ' AND (p.title LIKE ? OR p.description REGEXP ?)';
+      params.push('%' + q + '%', regexPattern);
+    }
     if (category) { sql += ' AND p.category = ?'; params.push(category); }
     if (sort === 'price_asc')  sql += ' ORDER BY p.price ASC';
     else if (sort === 'price_desc') sql += ' ORDER BY p.price DESC';
@@ -64,6 +70,51 @@ router.get('/flash-sale/events', async (req, res) => {
       'SELECT id, `name` AS title, start_at, end_at, is_active, created_by FROM flash_sale_events WHERE is_active = 1 AND end_at >= NOW() ORDER BY start_at ASC'
     );
     res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+/* ─── KATEGORI PRODUK ────────────────────────────────────────── */
+router.get('/categories', async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT id, name FROM categories WHERE status = 'APPROVED' ORDER BY name ASC");
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+router.post('/categories', verifyToken, async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Nama kategori tidak boleh kosong.' });
+  }
+  const categoryName = name.trim();
+  try {
+    const [existing] = await pool.query("SELECT id, status FROM categories WHERE name = ?", [categoryName]);
+    if (existing.length) {
+      const status = existing[0].status;
+      if (status === 'APPROVED') {
+        return res.status(400).json({ error: `Kategori "${categoryName}" sudah ada.` });
+      } else if (status === 'PENDING') {
+        return res.status(400).json({ error: `Kategori "${categoryName}" sedang menunggu persetujuan admin.` });
+      } else {
+        await pool.query(
+          "UPDATE categories SET status = 'PENDING', created_by = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
+          [req.user.id, existing[0].id]
+        );
+        return res.json({ message: 'Kategori berhasil diajukan kembali.' });
+      }
+    }
+
+    await pool.query(
+      "INSERT INTO categories (name, status, created_by) VALUES (?, 'PENDING', ?)",
+      [categoryName, req.user.id]
+    );
+    res.json({ message: 'Kategori baru berhasil diajukan, menunggu persetujuan admin.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });

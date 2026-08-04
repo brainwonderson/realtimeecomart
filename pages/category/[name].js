@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Head from 'next/head'
 import SiteNav from '../../components/SiteNav'
+import Footer from '../../components/Footer'
 
 const categories = ['Semua', 'Elektronik', 'Fashion', 'Kecantikan', 'Rumah Tangga', 'Olahraga', 'Makanan', 'Otomotif', 'Lainnya']
 
@@ -313,6 +314,7 @@ export default function CategoryPage() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

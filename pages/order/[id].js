@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import SiteNav from '../../components/SiteNav'
+import Footer from '../../components/Footer'
 import CheckoutProgress from '../../components/CheckoutProgress'
 import { authJson } from '../../lib/clientApi'
 import { getStoredUserId } from '../../lib/session'
@@ -220,6 +221,7 @@ export default function OrderConfirmation() {
           )}
         </aside>
       </div>
+      <Footer />
     </div>
   )
 }

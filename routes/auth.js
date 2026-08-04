@@ -21,7 +21,7 @@ router.post('/register', async (req, res) => {
     const [result] = await pool.query('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)', [name || '', email, hashed, userRole]);
     const userId = result.insertId;
     const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: userId, name: name || '', email, role: userRole } });
+    res.json({ token, user: { id: userId, name: name || '', email, role: userRole, avatar: null, phone: null } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -32,7 +32,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email & password required' });
   try {
-    const [rows] = await pool.query('SELECT id, name, email, password, role, is_banned FROM users WHERE email = ?', [email]);
+    const [rows] = await pool.query('SELECT id, name, email, password, role, is_banned, avatar, phone FROM users WHERE email = ?', [email]);
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
@@ -45,7 +45,7 @@ router.post('/login', async (req, res) => {
     if (user.is_banned) return res.status(403).json({ error: 'User is banned' });
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, phone: user.phone } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -70,7 +70,7 @@ router.post('/google', async (req, res) => {
 
     // Check if user already exists (by google_id or email)
     const [rows] = await pool.query(
-      'SELECT id, name, email, role, is_banned, google_id FROM users WHERE google_id = ? OR email = ? LIMIT 1',
+      'SELECT id, name, email, role, is_banned, google_id, avatar, phone FROM users WHERE google_id = ? OR email = ? LIMIT 1',
       [googleId, email]
     );
     let user = rows[0];
@@ -85,16 +85,16 @@ router.post('/google', async (req, res) => {
     } else {
       // Auto-register new user via Google
       const [result] = await pool.query(
-        'INSERT INTO users (name, email, password, role, google_id, is_verified) VALUES (?, ?, NULL, ?, ?, 1)',
-        [name || email, email, 'BUYER', googleId]
+        'INSERT INTO users (name, email, password, role, google_id, is_verified, avatar) VALUES (?, ?, NULL, ?, ?, 1, ?)',
+        [name || email, email, 'BUYER', googleId, picture || null]
       );
-      user = { id: result.insertId, name: name || email, email, role: 'BUYER' };
+      user = { id: result.insertId, name: name || email, email, role: 'BUYER', avatar: picture || null, phone: null };
     }
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, phone: user.phone },
     });
   } catch (err) {
     console.error('Google auth error details:', {

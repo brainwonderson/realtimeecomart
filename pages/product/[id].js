@@ -5,6 +5,7 @@ import { getStoredToken, getStoredUserId } from '../../lib/session'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import SiteNav from '../../components/SiteNav'
+import Footer from '../../components/Footer'
 
 
 function StarRow({ rating = 5 }) {
@@ -770,6 +771,7 @@ export default function ProductPage() {
           </form>
         </div>
       )}
+      <Footer />
     </div>
   )
 }

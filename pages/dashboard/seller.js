@@ -79,17 +79,27 @@ export default function SellerDashboard() {
   const [editingId, setEditingId]   = useState(null)
   const [imageInputKey, setImageInputKey] = useState(0)
 
+  // Categories state
+  const [categories, setCategories] = useState([])
+  const [selectedCategoryOption, setSelectedCategoryOption] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryMessage, setCategoryMessage] = useState(null)
+
   // Seller Banners state
   const [sellerBanners, setSellerBanners]       = useState([])
   const [sBannerForm, setSBannerForm]           = useState({ title: '', link_url: '', is_active: 1, type: 'toko' })
   const [sBannerFile, setSBannerFile]           = useState(null)
   const [sBannerPreview, setSBannerPreview]     = useState(null)
+  const [sBannerMobileFile, setSBannerMobileFile]           = useState(null)
+  const [sBannerMobilePreview, setSBannerMobilePreview]     = useState(null)
   const [sBannerSaving, setSBannerSaving]       = useState(false)
   const [sBannerError, setSBannerError]         = useState(null)
   const [sBannerEdit, setSBannerEdit]           = useState(null)
   const [sBannerEditForm, setSBannerEditForm]   = useState({ title: '', link_url: '', is_active: 1, type: 'toko' })
   const [sBannerEditFile, setSBannerEditFile]   = useState(null)
   const [sBannerEditPreview, setSBannerEditPreview] = useState(null)
+  const [sBannerEditMobileFile, setSBannerEditMobileFile]   = useState(null)
+  const [sBannerEditMobilePreview, setSBannerEditMobilePreview] = useState(null)
   const [sBannerEditSaving, setSBannerEditSaving]   = useState(false)
   const [sBannerEditError, setSBannerEditError]     = useState(null)
   const [flashSaleProposals, setFlashSaleProposals] = useState([])
@@ -98,6 +108,11 @@ export default function SellerDashboard() {
   const [flashSaleForm, setFlashSaleForm] = useState({ product: null, original_price: '', flash_sale_price: '', message: '' })
   const [showFlashSaleForm, setShowFlashSaleForm] = useState(false)
   const sBannerEditFileRef = useRef(null)
+
+  // Profile state
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', avatar: '', phone: '' })
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
+  const sBannerEditFileMobileRef = useRef(null)
 
   // Seller Promos states
   const emptyPromo = { name: '', discount_percentage: '', start_time: '', end_time: '', product_ids: [] }
@@ -139,13 +154,15 @@ export default function SellerDashboard() {
     let active = true
     async function load() {
       try {
-        const [storeData, sellerProducts, sellerOrders, sellBanners, sellerProposals, sellerPromosData] = await Promise.all([
+        const [storeData, sellerProducts, sellerOrders, sellBanners, sellerProposals, sellerPromosData, categoriesData, profileData] = await Promise.all([
           authJson('/seller/store').catch(() => null),
           authJson('/seller/products').catch(() => []),
           authJson('/seller/orders').catch(() => []),
           authJson('/seller/banners').catch(() => []),
           authJson('/seller/flash-sale/proposals').catch(() => []),
-          authJson('/seller/promos').catch(() => [])
+          authJson('/seller/promos').catch(() => []),
+          authJson('/products/categories').catch(() => []),
+          authJson(`/account/profile/${user.id}`).catch(() => null)
         ])
         if (!active) return
         setStore(storeData)
@@ -154,6 +171,15 @@ export default function SellerDashboard() {
         setSellerBanners(Array.isArray(sellBanners) ? sellBanners : [])
         setFlashSaleProposals(Array.isArray(sellerProposals) ? sellerProposals : [])
         setSellerPromos(Array.isArray(sellerPromosData) ? sellerPromosData : [])
+        setCategories(categoriesData || [])
+        if (profileData) {
+          setProfileForm({
+            name: profileData.name || '',
+            email: profileData.email || '',
+            avatar: profileData.avatar || '',
+            phone: profileData.phone || ''
+          })
+        }
         // Jika belum punya toko, auto pindah ke tab store
         if (!storeData) setActiveTab('store')
       } catch (err) {
@@ -176,13 +202,15 @@ export default function SellerDashboard() {
   }, [user])
 
   async function refresh() {
-    const [storeData, sellerProducts, sellerOrders, sellBanners, sellerProposals, sellerPromosData] = await Promise.all([
+    const [storeData, sellerProducts, sellerOrders, sellBanners, sellerProposals, sellerPromosData, categoriesData, profileData] = await Promise.all([
       authJson('/seller/store').catch(() => null),
       authJson('/seller/products').catch(() => []),
       authJson('/seller/orders').catch(() => []),
       authJson('/seller/banners').catch(() => []),
       authJson('/seller/flash-sale/proposals').catch(() => []),
-      authJson('/seller/promos').catch(() => [])
+      authJson('/seller/promos').catch(() => []),
+      authJson('/products/categories').catch(() => []),
+      authJson(`/account/profile/${user.id}`).catch(() => null)
     ])
     setStore(storeData)
     setProducts(sellerProducts || [])
@@ -190,6 +218,15 @@ export default function SellerDashboard() {
     setSellerBanners(Array.isArray(sellBanners) ? sellBanners : [])
     setFlashSaleProposals(Array.isArray(sellerProposals) ? sellerProposals : [])
     setSellerPromos(Array.isArray(sellerPromosData) ? sellerPromosData : [])
+    setCategories(categoriesData || [])
+    if (profileData) {
+      setProfileForm({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        avatar: profileData.avatar || '',
+        phone: profileData.phone || ''
+      })
+    }
   }
 
   // Fetch chat rooms
@@ -313,6 +350,27 @@ export default function SellerDashboard() {
     setStoreMode('create')
   }
 
+  async function handleProposeCategory() {
+    if (!newCategoryName.trim()) {
+      setCategoryMessage({ type: 'error', text: 'Nama kategori tidak boleh kosong.' });
+      return;
+    }
+    try {
+      setCategoryMessage(null);
+      const res = await authJson('/products/categories', {
+        method: 'POST',
+        body: JSON.stringify({ name: newCategoryName })
+      });
+      setCategoryMessage({ type: 'success', text: res.message || 'Kategori berhasil diajukan!' });
+      setNewCategoryName('');
+      // Reload categories list
+      const cats = await authJson('/products/categories').catch(() => []);
+      setCategories(cats || []);
+    } catch (err) {
+      setCategoryMessage({ type: 'error', text: err.message || 'Gagal mengajukan kategori.' });
+    }
+  }
+
   /* ─── product actions ─── */
   async function saveProduct() {
     if (!store) { alert('Buka toko dulu sebelum menambahkan produk!'); return }
@@ -391,6 +449,52 @@ export default function SellerDashboard() {
     })
     setActiveTab('products')
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleAvatarChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran foto terlalu besar (maksimal 5MB)');
+      return;
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setProfileForm(prev => ({ ...prev, avatar: ev.target.result }));
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function saveProfile() {
+    try {
+      await authJson(`/account/profile/${user.id}`, { method: 'PATCH', body: JSON.stringify(profileForm) })
+      const profileData = await authJson(`/account/profile/${user.id}`)
+      setProfileForm({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        avatar: profileData.avatar || '',
+        phone: profileData.phone || ''
+      })
+      const stored = getStoredUser()
+      if (stored) {
+        const updated = { ...stored, name: profileData.name, email: profileData.email, avatar: profileData.avatar || null };
+        localStorage.setItem('user', JSON.stringify(updated));
+        window.dispatchEvent(new Event('session-updated'));
+      }
+      alert('Profil disimpan')
+    } catch (err) {
+      alert('Gagal menyimpan profil: ' + err.message)
+    }
+  }
+
+  async function changePassword() {
+    try {
+      await authJson(`/account/password/${user.id}`, { method: 'PATCH', body: JSON.stringify(passwordForm) })
+      setPasswordForm({ currentPassword: '', newPassword: '' })
+      alert('Password diperbarui')
+    } catch (err) {
+      alert('Gagal memperbarui password: ' + err.message)
+    }
   }
 
   async function deleteProduct(id) {
@@ -565,6 +669,7 @@ export default function SellerDashboard() {
       const fd = new FormData()
       fd.append('title', sBannerForm.title)
       fd.append('image', sBannerFile)
+      if (sBannerMobileFile) fd.append('image_mobile', sBannerMobileFile)
       fd.append('type', sBannerForm.type)
       if (sBannerForm.link_url) fd.append('link_url', sBannerForm.link_url)
       fd.append('is_active', String(sBannerForm.is_active))
@@ -572,6 +677,7 @@ export default function SellerDashboard() {
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Gagal simpan') }
       setSBannerForm({ title: '', link_url: '', is_active: 1, type: 'toko' })
       setSBannerFile(null); setSBannerPreview(null)
+      setSBannerMobileFile(null); setSBannerMobilePreview(null)
       await refresh()
     } catch (err) { setSBannerError(err.message) }
     finally { setSBannerSaving(false) }
@@ -586,10 +692,16 @@ export default function SellerDashboard() {
   function openSBannerEdit(b) {
     setSBannerEdit(b)
     setSBannerEditForm({ title: b.title, link_url: b.link_url || '', is_active: b.is_active, type: b.type || 'toko' })
-    setSBannerEditFile(null); setSBannerEditPreview(null); setSBannerEditError(null)
+    setSBannerEditFile(null); setSBannerEditPreview(null)
+    setSBannerEditMobileFile(null); setSBannerEditMobilePreview(null)
+    setSBannerEditError(null)
   }
 
-  function closeSBannerEdit() { setSBannerEdit(null); setSBannerEditFile(null); setSBannerEditPreview(null) }
+  function closeSBannerEdit() {
+    setSBannerEdit(null)
+    setSBannerEditFile(null); setSBannerEditPreview(null)
+    setSBannerEditMobileFile(null); setSBannerEditMobilePreview(null)
+  }
 
   async function saveSBannerEdit() {
     if (!sBannerEditForm.title) return
@@ -601,6 +713,7 @@ export default function SellerDashboard() {
       fd.append('is_active', String(sBannerEditForm.is_active))
       fd.append('type', sBannerEditForm.type)
       if (sBannerEditFile) fd.append('image', sBannerEditFile)
+      if (sBannerEditMobileFile) fd.append('image_mobile', sBannerEditMobileFile)
       const res = await authFetch(`/seller/banners/${sBannerEdit.id}`, { method: 'PATCH', body: fd })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Gagal simpan') }
       closeSBannerEdit(); await refresh()
@@ -678,6 +791,7 @@ export default function SellerDashboard() {
                 { id: 'banners',    label: '🎯 Banner' },
                 { id: 'promotions', label: '🏷️ Promo Toko' },
                 { id: 'chat',       label: '💬 Chat Pembeli' },
+                { id: 'profile',    label: '👤 Profil Diri' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -1088,10 +1202,74 @@ export default function SellerDashboard() {
                     </div>
                   </div>
 
-                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label className="field-label">Kategori</label>
-                      <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Contoh: Elektronik" id="product-category-input" />
+                      <select
+                        value={selectedCategoryOption === '__NEW__' ? '__NEW__' : form.category}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === '__NEW__') {
+                            setSelectedCategoryOption('__NEW__');
+                            setCategoryMessage(null);
+                          } else {
+                            setSelectedCategoryOption('');
+                            setForm(f => ({ ...f, category: val }));
+                          }
+                        }}
+                        id="product-category-select"
+                      >
+                        <option value="">-- Pilih Kategori --</option>
+                        {categories.map(c => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                        {form.category && !categories.some(c => c.name === form.category) && (
+                          <option value={form.category}>{form.category}</option>
+                        )}
+                        <option value="__NEW__">+ Kategori Baru (Ajukan ke Admin)</option>
+                      </select>
+                      {selectedCategoryOption === '__NEW__' && (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                          <input
+                            type="text"
+                            placeholder="Nama kategori baru..."
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            id="new-category-input"
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            className="button"
+                            style={{ padding: '0 12px', fontSize: '13px' }}
+                            onClick={handleProposeCategory}
+                          >
+                            Ajukan
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            style={{ padding: '0 12px', fontSize: '13px' }}
+                            onClick={() => {
+                              setSelectedCategoryOption('');
+                              setNewCategoryName('');
+                              setCategoryMessage(null);
+                            }}
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      )}
+                      {categoryMessage && (
+                        <p style={{
+                          fontSize: 12,
+                          marginTop: 4,
+                          color: categoryMessage.type === 'error' ? 'var(--red)' : '#10b981',
+                          fontWeight: '500'
+                        }}>
+                          {categoryMessage.text}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="field-label">Status</label>
@@ -1564,28 +1742,62 @@ export default function SellerDashboard() {
                       </select>
                     </label>
 
-                    <div className="banner-upload-area" style={{ marginTop: 8 }}>
-                      <label htmlFor="s-banner-img-input" className="banner-upload-label">
-                        {sBannerPreview ? (
-                          <img src={sBannerPreview} alt="Preview" className="banner-img-preview" />
-                        ) : (
-                          <div className="banner-upload-placeholder">
-                            <span className="banner-upload-icon">🖼️</span>
-                            <span>Klik untuk pilih gambar</span>
-                            <span className="muted" style={{ fontSize: '0.78rem' }}>JPG, PNG, WEBP — maks. 10MB</span>
-                          </div>
-                        )}
-                      </label>
-                      <input id="s-banner-img-input" type="file" accept="image/*" style={{ display: 'none' }}
-                        onChange={e => {
-                          const f = e.target.files?.[0]; if (!f) return
-                          setSBannerFile(f)
-                          const r = new FileReader(); r.onload = ev => setSBannerPreview(ev.target.result); r.readAsDataURL(f)
-                        }} />
-                      {sBannerPreview && (
-                        <button className="ghost-button" style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}
-                          onClick={() => { setSBannerPreview(null); setSBannerFile(null) }}>Hapus gambar</button>
-                      )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                      <div>
+                        <p className="field-label" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar Desktop *</p>
+                        <div className="banner-upload-area">
+                          <label htmlFor="s-banner-img-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                            {sBannerPreview ? (
+                              <img src={sBannerPreview} alt="Preview Desktop" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                            ) : (
+                              <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                                <span className="banner-upload-icon" style={{ fontSize: 16 }}>🖥️</span>
+                                <span style={{ fontSize: 11 }}>Pilih banner desktop</span>
+                              </div>
+                            )}
+                          </label>
+                          <input id="s-banner-img-input" type="file" accept="image/*" style={{ display: 'none' }}
+                            onChange={e => {
+                              const f = e.target.files?.[0]; if (!f) return
+                              setSBannerFile(f)
+                              const r = new FileReader(); r.onload = ev => setSBannerPreview(ev.target.result); r.readAsDataURL(f)
+                            }} />
+                          {sBannerPreview && (
+                            <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                              onClick={() => { setSBannerPreview(null); setSBannerFile(null) }}>
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="field-label" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar HP (Opsional)</p>
+                        <div className="banner-upload-area">
+                          <label htmlFor="s-banner-img-mobile-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                            {sBannerMobilePreview ? (
+                              <img src={sBannerMobilePreview} alt="Preview Mobile" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                            ) : (
+                              <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                                <span className="banner-upload-icon" style={{ fontSize: 16 }}>📱</span>
+                                <span style={{ fontSize: 11 }}>Pilih banner HP</span>
+                              </div>
+                            )}
+                          </label>
+                          <input id="s-banner-img-mobile-input" type="file" accept="image/*" style={{ display: 'none' }}
+                            onChange={e => {
+                              const f = e.target.files?.[0]; if (!f) return
+                              setSBannerMobileFile(f)
+                              const r = new FileReader(); r.onload = ev => setSBannerMobilePreview(ev.target.result); r.readAsDataURL(f)
+                            }} />
+                          {sBannerMobilePreview && (
+                            <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                              onClick={() => { setSBannerMobilePreview(null); setSBannerMobileFile(null) }}>
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <input value={sBannerForm.link_url} onChange={e => setSBannerForm({ ...sBannerForm, link_url: e.target.value })} placeholder="Link tujuan (opsional)" style={{ marginTop: 8 }} />
@@ -1875,6 +2087,90 @@ export default function SellerDashboard() {
                 )}
               </div>
             )}
+
+            {activeTab === 'profile' && (
+              <section className="panel stack" style={{ gap: 20 }}>
+                <h3>Profile Diri</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div style={{ position: 'relative', width: 90, height: 90 }}>
+                    {profileForm.avatar ? (
+                      <img 
+                        src={profileForm.avatar} 
+                        alt="Avatar" 
+                        style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} 
+                      />
+                    ) : (
+                      <div style={{ 
+                        width: 90, 
+                        height: 90, 
+                        borderRadius: '50%', 
+                        background: 'var(--accent)', 
+                        color: '#fff', 
+                        display: 'grid', 
+                        placeItems: 'center', 
+                        fontSize: 32, 
+                        fontWeight: 800 
+                      }}>
+                        {(profileForm.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <label 
+                      htmlFor="avatar-upload-input-seller"
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'grid',
+                        placeItems: 'center',
+                        cursor: 'pointer',
+                        border: '2px solid var(--bg-card)',
+                        fontSize: 14,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                      }}
+                      title="Ubah Foto Profil"
+                    >
+                      📷
+                    </label>
+                    <input 
+                      type="file" 
+                      id="avatar-upload-input-seller" 
+                      accept="image/*" 
+                      onChange={handleAvatarChange} 
+                      style={{ display: 'none' }} 
+                    />
+                  </div>
+                  <div className="stack" style={{ gap: 4 }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Foto Profil</h4>
+                    <p className="muted" style={{ margin: 0, fontSize: 12 }}>Pilih foto JPG, PNG, atau WebP. Maksimal 5 MB.</p>
+                  </div>
+                </div>
+
+                <div className="stack" style={{ gap: 12 }}>
+                  <label className="field-label" style={{ margin: 0 }}>Nama Lengkap</label>
+                  <input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Nama" />
+                  
+                  <label className="field-label" style={{ margin: 0 }}>Alamat Email</label>
+                  <input value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} placeholder="Email" />
+
+                  <label className="field-label" style={{ margin: 0 }}>Nomor Telepon</label>
+                  <input value={profileForm.phone || ''} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="Contoh: 08123456789" />
+                </div>
+                
+                <button className="button" onClick={saveProfile}>Simpan profile</button>
+
+                <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '10px 0' }} />
+
+                <h3>Ganti password</h3>
+                <input type="password" value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} placeholder="Password lama" />
+                <input type="password" value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} placeholder="Password baru" />
+                <button className="ghost-button" onClick={changePassword}>Update password</button>
+              </section>
+            )}
           </>
         )}
       </div>
@@ -1911,33 +2207,65 @@ export default function SellerDashboard() {
                   <option value={0}>Nonaktif</option>
                 </select>
               </label>
-              <div>
-                <p className="modal-label-text">Gambar banner</p>
-                <div className="banner-upload-area">
-                  <label htmlFor="s-edit-banner-img" className="banner-upload-label">
-                    {sBannerEditPreview ? (
-                      <img src={sBannerEditPreview} alt="Preview" className="banner-img-preview" />
-                    ) : (
-                      <div className="banner-upload-placeholder" style={{ minHeight: 90 }}>
-                        {sBannerEdit.image ? (
-                          <img src={sBannerEdit.image} alt="" style={{ maxHeight: 80, objectFit: 'contain', borderRadius: 6 }} />
-                        ) : <span className="banner-upload-icon">🖼️</span>}
-                        <span style={{ fontSize: '0.8rem' }}>Klik untuk ganti gambar</span>
-                      </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <p className="modal-label-text" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar Desktop</p>
+                  <div className="banner-upload-area">
+                    <label htmlFor="s-edit-banner-img" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                      {sBannerEditPreview ? (
+                        <img src={sBannerEditPreview} alt="Preview Desktop" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                      ) : (
+                        <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                          {sBannerEdit.image ? (
+                            <img src={sBannerEdit.image} alt="" style={{ maxHeight: '60px', objectFit: 'contain', borderRadius: 6 }} />
+                          ) : <span className="banner-upload-icon" style={{ fontSize: 16 }}>🖥️</span>}
+                          <span style={{ fontSize: '0.75rem' }}>Ganti Desktop</span>
+                        </div>
+                      )}
+                    </label>
+                    <input ref={sBannerEditFileRef} id="s-edit-banner-img" type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0]; if (!f) return
+                        setSBannerEditFile(f)
+                        const r = new FileReader(); r.onload = ev => setSBannerEditPreview(ev.target.result); r.readAsDataURL(f)
+                      }} />
+                    {sBannerEditPreview && (
+                      <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                        onClick={() => { setSBannerEditPreview(null); setSBannerEditFile(null); if (sBannerEditFileRef.current) sBannerEditFileRef.current.value = '' }}>
+                        Batal
+                      </button>
                     )}
-                  </label>
-                  <input ref={sBannerEditFileRef} id="s-edit-banner-img" type="file" accept="image/*" style={{ display: 'none' }}
-                    onChange={e => {
-                      const f = e.target.files?.[0]; if (!f) return
-                      setSBannerEditFile(f)
-                      const r = new FileReader(); r.onload = ev => setSBannerEditPreview(ev.target.result); r.readAsDataURL(f)
-                    }} />
-                  {sBannerEditPreview && (
-                    <button className="ghost-button" style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}
-                      onClick={() => { setSBannerEditPreview(null); setSBannerEditFile(null); if (sBannerEditFileRef.current) sBannerEditFileRef.current.value = '' }}>
-                      Batal ganti
-                    </button>
-                  )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="modal-label-text" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar HP (Opsional)</p>
+                  <div className="banner-upload-area">
+                    <label htmlFor="s-edit-banner-img-mobile" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                      {sBannerEditMobilePreview ? (
+                        <img src={sBannerEditMobilePreview} alt="Preview Mobile" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                      ) : (
+                        <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                          {sBannerEdit.image_mobile ? (
+                            <img src={sBannerEdit.image_mobile} alt="" style={{ maxHeight: '60px', objectFit: 'contain', borderRadius: 6 }} />
+                          ) : <span className="banner-upload-icon" style={{ fontSize: 16 }}>📱</span>}
+                          <span style={{ fontSize: '0.75rem' }}>Ganti Banner HP</span>
+                        </div>
+                      )}
+                    </label>
+                    <input ref={sBannerEditFileMobileRef} id="s-edit-banner-img-mobile" type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0]; if (!f) return
+                        setSBannerEditMobileFile(f)
+                        const r = new FileReader(); r.onload = ev => setSBannerEditMobilePreview(ev.target.result); r.readAsDataURL(f)
+                      }} />
+                    {sBannerEditMobilePreview && (
+                      <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                        onClick={() => { setSBannerEditMobilePreview(null); setSBannerEditMobileFile(null); if (sBannerEditFileMobileRef.current) sBannerEditFileMobileRef.current.value = '' }}>
+                        Batal
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               {sBannerEditError && <p style={{ color: 'var(--red)', margin: 0, fontSize: '0.85rem' }}>{sBannerEditError}</p>}

@@ -270,13 +270,7 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
 
         {/* Search with Autocomplete */}
         <form className="topbar-search" onSubmit={submitSearch} role="search" style={{ position: 'relative' }}>
-          <select className="topbar-search-category" aria-label="Kategori pencarian">
-            <option>Semua Kategori</option>
-            <option>Elektronik</option>
-            <option>Fashion</option>
-            <option>Kecantikan</option>
-            <option>Olahraga</option>
-          </select>
+
           <input
             ref={inputRef}
             value={q}
@@ -567,7 +561,7 @@ export default function SiteNav({ title = 'EcoMart', subtitle = 'Belanja Cerdas,
                   <span>{isBuyerSeller ? 'BUYER + SELLER' : role}</span>
                 </span>
               </Link>
-              <button className="nav-link-btn" type="button" onClick={logout}>Logout</button>
+              <button className="nav-link-btn nav-logout-btn" type="button" onClick={logout}>Logout</button>
             </>
           )}
         </div>

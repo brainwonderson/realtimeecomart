@@ -259,7 +259,7 @@ export default function BuyerDashboard() {
   const [sellerStore, setSellerStore] = useState(null)
   const [showBukaToko, setShowBukaToko] = useState(false)
 
-  const [profileForm, setProfileForm] = useState({ name: '', email: '' })
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', avatar: '', phone: '' })
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
   const [addressForm, setAddressForm] = useState({
     label: 'Home', recipient_name: '', phone: '',
@@ -287,7 +287,7 @@ export default function BuyerDashboard() {
         setProfile(profileData)
         setAddresses(addressData || [])
         setOrders(orderData || [])
-        setProfileForm({ name: profileData.name || '', email: profileData.email || '' })
+        setProfileForm({ name: profileData.name || '', email: profileData.email || '', avatar: profileData.avatar || '', phone: profileData.phone || '' })
         setAddressForm(prev => ({ ...prev, recipient_name: profileData.name || '' }))
 
         if (meData) {
@@ -377,9 +377,40 @@ export default function BuyerDashboard() {
     }
   }
 
+  function handleAvatarChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran foto terlalu besar (maksimal 5MB)');
+      return;
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setProfileForm(prev => ({ ...prev, avatar: ev.target.result }));
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function saveProfile() {
-    await authJson(`/account/profile/${user.id}`, { method: 'PATCH', body: JSON.stringify(profileForm) })
-    alert('Profil disimpan')
+    try {
+      await authJson(`/account/profile/${user.id}`, { method: 'PATCH', body: JSON.stringify(profileForm) })
+      const profileData = await authJson(`/account/profile/${user.id}`)
+      setProfileForm({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        avatar: profileData.avatar || '',
+        phone: profileData.phone || ''
+      })
+      const stored = getStoredUser()
+      if (stored) {
+        const updated = { ...stored, name: profileData.name, email: profileData.email, avatar: profileData.avatar || null };
+        localStorage.setItem('user', JSON.stringify(updated));
+        window.dispatchEvent(new Event('session-updated'));
+      }
+      alert('Profil disimpan')
+    } catch (err) {
+      alert('Gagal menyimpan profil: ' + err.message)
+    }
   }
 
   async function changePassword() {
@@ -677,10 +708,78 @@ export default function BuyerDashboard() {
 
           {/* ── TAB: PROFILE ── */}
           {tab === 'profile' && (
-            <section className="panel stack">
+            <section className="panel stack" style={{ gap: 20 }}>
               <h3>Profile</h3>
-              <input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Nama" />
-              <input value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} placeholder="Email" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
+                <div style={{ position: 'relative', width: 90, height: 90 }}>
+                  {profileForm.avatar ? (
+                    <img 
+                      src={profileForm.avatar} 
+                      alt="Avatar" 
+                      style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} 
+                    />
+                  ) : (
+                    <div style={{ 
+                      width: 90, 
+                      height: 90, 
+                      borderRadius: '50%', 
+                      background: 'var(--accent)', 
+                      color: '#fff', 
+                      display: 'grid', 
+                      placeItems: 'center', 
+                      fontSize: 32, 
+                      fontWeight: 800 
+                    }}>
+                      {(profileForm.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <label 
+                    htmlFor="avatar-upload-input-buyer"
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      display: 'grid',
+                      placeItems: 'center',
+                      cursor: 'pointer',
+                      border: '2px solid var(--bg-card)',
+                      fontSize: 14,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                    }}
+                    title="Ubah Foto Profil"
+                  >
+                    📷
+                  </label>
+                  <input 
+                    type="file" 
+                    id="avatar-upload-input-buyer" 
+                    accept="image/*" 
+                    onChange={handleAvatarChange} 
+                    style={{ display: 'none' }} 
+                  />
+                </div>
+                <div className="stack" style={{ gap: 4 }}>
+                  <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Foto Profil</h4>
+                  <p className="muted" style={{ margin: 0, fontSize: 12 }}>Pilih foto JPG, PNG, atau WebP. Maksimal 5 MB.</p>
+                </div>
+              </div>
+
+              <div className="stack" style={{ gap: 12 }}>
+                <label className="field-label" style={{ margin: 0 }}>Nama Lengkap</label>
+                <input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Nama" />
+                
+                <label className="field-label" style={{ margin: 0 }}>Alamat Email</label>
+                <input value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} placeholder="Email" />
+
+                <label className="field-label" style={{ margin: 0 }}>Nomor Telepon</label>
+                <input value={profileForm.phone || ''} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="Contoh: 08123456789" />
+              </div>
+              
               <button className="button" onClick={saveProfile}>Simpan profile</button>
 
               <h3>Ganti password</h3>

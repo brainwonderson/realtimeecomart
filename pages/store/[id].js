@@ -5,6 +5,7 @@ import { getStoredUserId } from '../../lib/session'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import SiteNav from '../../components/SiteNav'
+import Footer from '../../components/Footer'
 
 function StarRow({ rating = 5, size = 13 }) {
   return (
@@ -172,12 +173,18 @@ export default function StorePage() {
                 {storeBanners.map((b) => (
                   b.link_url ? (
                     <a key={b.id} href={b.link_url} className="promo-banner-slide" target="_blank" rel="noopener noreferrer">
-                      <img src={b.image} alt={b.title} className="promo-banner-img" />
+                      <picture style={{ display: 'block', width: '100%', height: '100%' }}>
+                        {b.image_mobile && <source media="(max-width: 640px)" srcSet={b.image_mobile} />}
+                        <img src={b.image} alt={b.title} className="promo-banner-img" />
+                      </picture>
                       <div className="promo-banner-caption">{b.title}</div>
                     </a>
                   ) : (
                     <div key={b.id} className="promo-banner-slide">
-                      <img src={b.image} alt={b.title} className="promo-banner-img" />
+                      <picture style={{ display: 'block', width: '100%', height: '100%' }}>
+                        {b.image_mobile && <source media="(max-width: 640px)" srcSet={b.image_mobile} />}
+                        <img src={b.image} alt={b.title} className="promo-banner-img" />
+                      </picture>
                       <div className="promo-banner-caption">{b.title}</div>
                     </div>
                   )
@@ -310,6 +317,7 @@ export default function StorePage() {
           )}
         </div>
       </div>
+      <Footer />
     </div>
   )
 }

@@ -1,8 +1,12 @@
 {
+  "watch": ["server.js", "routes", "utils"],
+  "ext": "js,json",
   "ignore": [
     ".next/*",
     "node_modules/*",
     "uploads/*",
-    ".git/*"
+    "pages/*",
+    "components/*",
+    "styles/*"
   ]
 }

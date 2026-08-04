@@ -9,7 +9,7 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
   const userId = req.params.userId;
   if (String(req.user.id) !== String(userId) && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'forbidden' });
   try {
-    const [rows] = await pool.query('SELECT id, name, email, role, is_verified, created_at FROM users WHERE id = ?', [userId]);
+    const [rows] = await pool.query('SELECT id, name, email, role, is_verified, avatar, phone, created_at FROM users WHERE id = ?', [userId]);
     const user = rows[0];
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
@@ -21,14 +21,40 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
 
 router.patch('/profile/:userId', verifyToken, async (req, res) => {
   const userId = req.params.userId;
-  const { name, email } = req.body;
+  const { name, email, avatar, phone } = req.body;
   if (String(req.user.id) !== String(userId) && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'forbidden' });
   try {
-    await pool.query('UPDATE users SET name = ?, email = ? WHERE id = ?', [name || req.user.name, email || req.user.email, userId]);
+    const [existing] = await pool.query('SELECT name, email, avatar, phone FROM users WHERE id = ?', [userId]);
+    if (!existing.length) return res.status(404).json({ error: 'not found' });
+
+    const current = existing[0];
+    const newName = name !== undefined ? name : current.name;
+    const newEmail = email !== undefined ? email : current.email;
+    const newPhone = phone !== undefined ? phone : current.phone;
+
+    let finalAvatar = current.avatar;
+    if (avatar !== undefined) {
+      if (avatar && avatar.startsWith('data:image')) {
+        const { uploadBase64ToCloudinary } = require('../utils/cloudinary');
+        try {
+          finalAvatar = await uploadBase64ToCloudinary(avatar, 'avatars');
+        } catch (uploadErr) {
+          console.error('Failed to upload avatar to Cloudinary:', uploadErr);
+          return res.status(500).json({ error: 'Gagal mengunggah foto profil.' });
+        }
+      } else {
+        finalAvatar = avatar;
+      }
+    }
+
+    await pool.query(
+      'UPDATE users SET name = ?, email = ?, avatar = ?, phone = ? WHERE id = ?',
+      [newName, newEmail, finalAvatar, newPhone, userId]
+    );
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'server' });
+    res.status(500).json({ error: 'server error' });
   }
 });
 

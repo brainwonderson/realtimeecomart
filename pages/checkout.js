@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Link from 'next/link'
 import SiteNav from '../components/SiteNav'
+import Footer from '../components/Footer'
 import CheckoutProgress from '../components/CheckoutProgress'
 import OrderSummary from '../components/OrderSummary'
 import PaymentMethodPicker from '../components/PaymentMethodPicker'
@@ -429,6 +430,7 @@ export default function Checkout() {
           </div>
         </OrderSummary>
       </div>
+      <Footer />
     </div>
   )
 }

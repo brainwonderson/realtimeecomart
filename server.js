@@ -74,3 +74,4 @@ app.prepare().then(() => {
     }, 10000);
   });
 });
+// Trigger nodemon restart

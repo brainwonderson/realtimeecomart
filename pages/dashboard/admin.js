@@ -39,6 +39,8 @@ export default function AdminDashboard() {
   const [bannerForm, setBannerForm] = useState(emptyBanner)
   const [bannerImageFile, setBannerImageFile] = useState(null)
   const [bannerImagePreview, setBannerImagePreview] = useState(null)
+  const [bannerImageMobileFile, setBannerImageMobileFile] = useState(null)
+  const [bannerImageMobilePreview, setBannerImageMobilePreview] = useState(null)
   const [bannerSaving, setBannerSaving] = useState(false)
   const [bannerError, setBannerError] = useState(null)
   const [bannerFilterType, setBannerFilterType] = useState('all')
@@ -46,6 +48,13 @@ export default function AdminDashboard() {
   const [flashSaleEvents, setFlashSaleEvents] = useState([])
   const [flashSaleEventForm, setFlashSaleEventForm] = useState({ title: '', description: '', start_at: '', end_at: '', is_active: 1 })
   const [flashSaleEventSaving, setFlashSaleEventSaving] = useState(false)
+
+  // Categories moderation state
+  const [categories, setCategories] = useState([])
+
+  // Profile state
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', avatar: '', phone: '' })
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
   const [flashSaleError, setFlashSaleError] = useState(null)
   const [flashSaleProposals, setFlashSaleProposals] = useState([])
 
@@ -72,9 +81,12 @@ export default function AdminDashboard() {
   const [editForm, setEditForm] = useState({ title: '', link_url: '', is_active: 1, type: 'homepage' })
   const [editImageFile, setEditImageFile] = useState(null)
   const [editImagePreview, setEditImagePreview] = useState(null)
+  const [editImageMobileFile, setEditImageMobileFile] = useState(null)
+  const [editImageMobilePreview, setEditImageMobilePreview] = useState(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState(null)
   const editFileInputRef = useRef(null)
+  const editFileInputMobileRef = useRef(null)
 
   useEffect(() => {
     setUser(getStoredUser())
@@ -86,7 +98,7 @@ export default function AdminDashboard() {
     let active = true
     async function load() {
       try {
-        const [statsData, usersData, productsData, bannersData, eventsData, proposalsData, promosData] = await Promise.all([
+        const [statsData, usersData, productsData, bannersData, eventsData, proposalsData, promosData, categoriesData, profileData] = await Promise.all([
           authJson('/admin/stats'),
           authJson('/admin/users'),
           authJson('/products'),
@@ -94,6 +106,8 @@ export default function AdminDashboard() {
           authJson('/products/flash-sale/events'),
           authJson('/admin/flash-sale/proposals'),
           authJson('/admin/promos').catch(() => []),
+          authJson('/admin/categories').catch(() => []),
+          authJson(`/account/profile/${user.id}`).catch(() => null)
         ])
         if (!active) return
         setStats(statsData)
@@ -103,6 +117,15 @@ export default function AdminDashboard() {
         setFlashSaleEvents(Array.isArray(eventsData) ? eventsData : [])
         setFlashSaleProposals(Array.isArray(proposalsData) ? proposalsData : [])
         setPromos(Array.isArray(promosData) ? promosData : [])
+        setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+        if (profileData) {
+          setProfileForm({
+            name: profileData.name || '',
+            email: profileData.email || '',
+            avatar: profileData.avatar || '',
+            phone: profileData.phone || ''
+          })
+        }
       } catch (err) {
         if (active) console.error(err)
       } finally {
@@ -115,7 +138,7 @@ export default function AdminDashboard() {
 
   async function refresh() {
     try {
-      const [statsData, usersData, productsData, bannersData, eventsData, proposalsData, promosData] = await Promise.all([
+      const [statsData, usersData, productsData, bannersData, eventsData, proposalsData, promosData, categoriesData, profileData] = await Promise.all([
         authJson('/admin/stats'),
         authJson('/admin/users'),
         authJson('/products'),
@@ -123,6 +146,8 @@ export default function AdminDashboard() {
         authJson('/products/flash-sale/events'),
         authJson('/admin/flash-sale/proposals'),
         authJson('/admin/promos').catch(() => []),
+        authJson('/admin/categories').catch(() => []),
+        authJson(`/account/profile/${user.id}`).catch(() => null)
       ])
       setStats(statsData)
       setUsers(usersData || [])
@@ -131,6 +156,15 @@ export default function AdminDashboard() {
       setFlashSaleEvents(Array.isArray(eventsData) ? eventsData : [])
       setFlashSaleProposals(Array.isArray(proposalsData) ? proposalsData : [])
       setPromos(Array.isArray(promosData) ? promosData : [])
+      setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+      if (profileData) {
+        setProfileForm({
+          name: profileData.name || '',
+          email: profileData.email || '',
+          avatar: profileData.avatar || '',
+          phone: profileData.phone || ''
+        })
+      }
     } catch (err) {
       console.error('Refresh error:', err)
     }
@@ -269,6 +303,7 @@ export default function AdminDashboard() {
       const fd = new FormData()
       fd.append('title', bannerForm.title)
       fd.append('image', bannerImageFile)
+      if (bannerImageMobileFile) fd.append('image_mobile', bannerImageMobileFile)
       fd.append('type', bannerForm.type)
       if (bannerForm.link_url) fd.append('link_url', bannerForm.link_url)
       fd.append('is_active', String(bannerForm.is_active))
@@ -280,6 +315,8 @@ export default function AdminDashboard() {
       setBannerForm(emptyBanner)
       setBannerImageFile(null)
       setBannerImagePreview(null)
+      setBannerImageMobileFile(null)
+      setBannerImageMobilePreview(null)
       await refresh()
     } catch (err) {
       setBannerError(err.message)
@@ -342,12 +379,90 @@ export default function AdminDashboard() {
     }
   }
 
+  function handleAvatarChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran foto terlalu besar (maksimal 5MB)');
+      return;
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setProfileForm(prev => ({ ...prev, avatar: ev.target.result }));
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function saveProfile() {
+    try {
+      await authJson(`/account/profile/${user.id}`, { method: 'PATCH', body: JSON.stringify(profileForm) })
+      const profileData = await authJson(`/account/profile/${user.id}`)
+      setProfileForm({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        avatar: profileData.avatar || '',
+        phone: profileData.phone || ''
+      })
+      const stored = getStoredUser()
+      if (stored) {
+        const updated = { ...stored, name: profileData.name, email: profileData.email, avatar: profileData.avatar || null };
+        localStorage.setItem('user', JSON.stringify(updated));
+        window.dispatchEvent(new Event('session-updated'));
+      }
+      alert('Profil disimpan')
+    } catch (err) {
+      alert('Gagal menyimpan profil: ' + err.message)
+    }
+  }
+
+  async function changePassword() {
+    try {
+      await authJson(`/account/password/${user.id}`, { method: 'PATCH', body: JSON.stringify(passwordForm) })
+      setPasswordForm({ currentPassword: '', newPassword: '' })
+      alert('Password diperbarui')
+    } catch (err) {
+      alert('Gagal memperbarui password: ' + err.message)
+    }
+  }
+
+  /* ── Category Moderation Actions ── */
+  async function handleModerateCategory(id, status) {
+    try {
+      await authJson(`/admin/categories/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+      await refresh();
+    } catch (err) {
+      alert('Gagal memoderasi kategori: ' + err.message);
+    }
+  }
+
+  async function handleDeleteCategory(id) {
+    if (!confirm('Hapus kategori ini?')) return;
+    try {
+      await authJson(`/admin/categories/${id}`, { method: 'DELETE' });
+      await refresh();
+    } catch (err) {
+      alert('Gagal menghapus kategori: ' + err.message);
+    }
+  }
+
   function handleBannerImageChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setBannerImageFile(file)
     const reader = new FileReader()
     reader.onload = (ev) => setBannerImagePreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  function handleBannerImageMobileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBannerImageMobileFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setBannerImageMobilePreview(ev.target.result)
     reader.readAsDataURL(file)
   }
 
@@ -368,6 +483,8 @@ export default function AdminDashboard() {
     setEditForm({ title: banner.title, link_url: banner.link_url || '', is_active: banner.is_active, type: banner.type || 'homepage' })
     setEditImageFile(null)
     setEditImagePreview(null)
+    setEditImageMobileFile(null)
+    setEditImageMobilePreview(null)
     setEditError(null)
   }
 
@@ -375,6 +492,8 @@ export default function AdminDashboard() {
     setEditBanner(null)
     setEditImageFile(null)
     setEditImagePreview(null)
+    setEditImageMobileFile(null)
+    setEditImageMobilePreview(null)
     setEditError(null)
   }
 
@@ -384,6 +503,15 @@ export default function AdminDashboard() {
     setEditImageFile(file)
     const reader = new FileReader()
     reader.onload = (ev) => setEditImagePreview(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
+  function handleEditImageMobileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setEditImageMobileFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setEditImageMobilePreview(ev.target.result)
     reader.readAsDataURL(file)
   }
 
@@ -398,6 +526,7 @@ export default function AdminDashboard() {
       fd.append('is_active', String(editForm.is_active))
       fd.append('type', editForm.type)
       if (editImageFile) fd.append('image', editImageFile)
+      if (editImageMobileFile) fd.append('image_mobile', editImageMobileFile)
       const res = await authFetch(`/admin/banners/${editBanner.id}`, { method: 'PATCH', body: fd })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Gagal menyimpan' }))
@@ -444,6 +573,8 @@ export default function AdminDashboard() {
             <button className={`tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>📊 Ringkasan & User</button>
             <button className={`tab ${activeTab === 'banners' ? 'active' : ''}`} onClick={() => setActiveTab('banners')}>🖼️ Banner & Flash Sale</button>
             <button className={`tab ${activeTab === 'promos' ? 'active' : ''}`} onClick={() => setActiveTab('promos')}>🎫 Promosi Platform</button>
+            <button className={`tab ${activeTab === 'categories' ? 'active' : ''}`} onClick={() => setActiveTab('categories')}>🏷️ Kategori</button>
+            <button className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>👤 Profil Diri</button>
           </div>
 
           {activeTab === 'overview' && (
@@ -589,25 +720,52 @@ export default function AdminDashboard() {
                     </select>
                   </label>
 
-                  <div className="banner-upload-area" style={{ marginTop: 8 }}>
-                    <label htmlFor="banner-img-input" className="banner-upload-label">
-                      {bannerImagePreview ? (
-                        <img src={bannerImagePreview} alt="Preview" className="banner-img-preview" />
-                      ) : (
-                        <div className="banner-upload-placeholder">
-                          <span className="banner-upload-icon">🖼️</span>
-                          <span>Klik untuk pilih gambar</span>
-                          <span className="muted" style={{ fontSize: '0.78rem' }}>JPG, PNG, WEBP — maks. 10MB</span>
-                        </div>
-                      )}
-                    </label>
-                    <input id="banner-img-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerImageChange} />
-                    {bannerImagePreview && (
-                      <button className="ghost-button" style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}
-                        onClick={() => { setBannerImagePreview(null); setBannerImageFile(null) }}>
-                        Hapus gambar
-                      </button>
-                    )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                    <div>
+                      <p className="field-label" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar Banner Desktop *</p>
+                      <div className="banner-upload-area">
+                        <label htmlFor="banner-img-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                          {bannerImagePreview ? (
+                            <img src={bannerImagePreview} alt="Preview Desktop" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                          ) : (
+                            <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                              <span className="banner-upload-icon" style={{ fontSize: 16 }}>🖥️</span>
+                              <span style={{ fontSize: 11 }}>Pilih banner desktop</span>
+                            </div>
+                          )}
+                        </label>
+                        <input id="banner-img-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerImageChange} />
+                        {bannerImagePreview && (
+                          <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                            onClick={() => { setBannerImagePreview(null); setBannerImageFile(null) }}>
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="field-label" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar Banner HP (Opsional)</p>
+                      <div className="banner-upload-area">
+                        <label htmlFor="banner-img-mobile-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                          {bannerImageMobilePreview ? (
+                            <img src={bannerImageMobilePreview} alt="Preview Mobile" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                          ) : (
+                            <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                              <span className="banner-upload-icon" style={{ fontSize: 16 }}>📱</span>
+                              <span style={{ fontSize: 11 }}>Pilih banner HP</span>
+                            </div>
+                          )}
+                        </label>
+                        <input id="banner-img-mobile-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerImageMobileChange} />
+                        {bannerImageMobilePreview && (
+                          <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                            onClick={() => { setBannerImageMobilePreview(null); setBannerImageMobileFile(null) }}>
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <input value={bannerForm.link_url} onChange={e => setBannerForm({ ...bannerForm, link_url: e.target.value })} placeholder="Link tujuan (opsional)" style={{ marginTop: 8 }} />
@@ -895,6 +1053,169 @@ export default function AdminDashboard() {
               </section>
             </div>
           )}
+
+          {activeTab === 'categories' && (
+            <div className="dashboard-grid admin-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <section className="panel stack">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <h3>Moderasi Kategori</h3>
+                    <p className="muted">Setujui atau tolak kategori baru yang diajukan oleh seller.</p>
+                  </div>
+                  <span className="chip">{categories.length} Kategori Total</span>
+                </div>
+
+                {categories.length === 0 ? (
+                  <p className="muted">Belum ada kategori yang diajukan.</p>
+                ) : (
+                  categories.map(cat => (
+                    <article key={cat.id} className="table-card">
+                      <div className="table-card-head">
+                        <strong style={{ fontSize: '15px' }}>{cat.name}</strong>
+                        <span className="chip" style={{
+                          background: cat.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' :
+                                      cat.status === 'PENDING' ? 'rgba(245,158,11,0.1)' :
+                                      'rgba(239,68,68,0.1)',
+                          color: cat.status === 'APPROVED' ? '#10b981' :
+                                 cat.status === 'PENDING' ? '#f59e0b' :
+                                 '#dc2626'
+                        }}>{cat.status}</span>
+                      </div>
+                      <p className="muted" style={{ fontSize: 13, margin: '4px 0 0 0' }}>
+                        <strong>Diajukan Oleh:</strong> {cat.creator_name || <span className="muted">Sistem / Admin</span>}
+                      </p>
+                      <p className="muted" style={{ fontSize: 12, margin: '4px 0 0 0' }}>
+                        <strong>Tanggal:</strong> {new Date(cat.created_at).toLocaleString('id-ID')}
+                      </p>
+                      
+                      <div className="row-actions wrap" style={{ marginTop: 12 }}>
+                        {cat.status === 'PENDING' && (
+                          <>
+                            <button
+                              className="button"
+                              style={{ padding: '6px 12px', fontSize: 12, background: 'var(--green, #10b981)', color: '#fff' }}
+                              onClick={() => handleModerateCategory(cat.id, 'APPROVED')}
+                            >
+                              Setujui
+                            </button>
+                            <button
+                              className="ghost-button"
+                              style={{ padding: '6px 12px', fontSize: 12, color: 'var(--red)', borderColor: 'rgba(239,68,68,0.2)' }}
+                              onClick={() => handleModerateCategory(cat.id, 'REJECTED')}
+                            >
+                              Tolak
+                            </button>
+                          </>
+                        )}
+                        {cat.status !== 'PENDING' && (
+                          <button
+                            className="ghost-button"
+                            style={{ padding: '6px 12px', fontSize: 12 }}
+                            onClick={() => handleModerateCategory(cat.id, 'PENDING')}
+                          >
+                            Setel Pending
+                          </button>
+                        )}
+                        <button
+                          className="ghost-button"
+                          style={{ padding: '6px 12px', fontSize: 12, color: 'var(--red)', borderColor: 'rgba(239,68,68,0.1)' }}
+                          onClick={() => handleDeleteCategory(cat.id)}
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
+            <div className="dashboard-grid admin-grid" style={{ gridTemplateColumns: '1fr' }}>
+              <section className="panel stack" style={{ gap: 20 }}>
+                <h3>Profile Diri</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <div style={{ position: 'relative', width: 90, height: 90 }}>
+                    {profileForm.avatar ? (
+                      <img 
+                        src={profileForm.avatar} 
+                        alt="Avatar" 
+                        style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }} 
+                      />
+                    ) : (
+                      <div style={{ 
+                        width: 90, 
+                        height: 90, 
+                        borderRadius: '50%', 
+                        background: 'var(--accent)', 
+                        color: '#fff', 
+                        display: 'grid', 
+                        placeItems: 'center', 
+                        fontSize: 32, 
+                        fontWeight: 800 
+                      }}>
+                        {(profileForm.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <label 
+                      htmlFor="avatar-upload-input-admin"
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'grid',
+                        placeItems: 'center',
+                        cursor: 'pointer',
+                        border: '2px solid var(--bg-card)',
+                        fontSize: 14,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                      }}
+                      title="Ubah Foto Profil"
+                    >
+                      📷
+                    </label>
+                    <input 
+                      type="file" 
+                      id="avatar-upload-input-admin" 
+                      accept="image/*" 
+                      onChange={handleAvatarChange} 
+                      style={{ display: 'none' }} 
+                    />
+                  </div>
+                  <div className="stack" style={{ gap: 4 }}>
+                    <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Foto Profil</h4>
+                    <p className="muted" style={{ margin: 0, fontSize: 12 }}>Pilih foto JPG, PNG, atau WebP. Maksimal 5 MB.</p>
+                  </div>
+                </div>
+
+                <div className="stack" style={{ gap: 12 }}>
+                  <label className="field-label" style={{ margin: 0 }}>Nama Lengkap</label>
+                  <input value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })} placeholder="Nama" />
+                  
+                  <label className="field-label" style={{ margin: 0 }}>Alamat Email</label>
+                  <input value={profileForm.email} onChange={e => setProfileForm({ ...profileForm, email: e.target.value })} placeholder="Email" />
+
+                  <label className="field-label" style={{ margin: 0 }}>Nomor Telepon</label>
+                  <input value={profileForm.phone || ''} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="Contoh: 08123456789" />
+                </div>
+                
+                <button className="button" onClick={saveProfile}>Simpan profile</button>
+
+                <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '10px 0' }} />
+
+                <h3>Ganti password</h3>
+                <input type="password" value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} placeholder="Password lama" />
+                <input type="password" value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} placeholder="Password baru" />
+                <button className="ghost-button" onClick={changePassword}>Update password</button>
+              </section>
+            </div>
+          )}
         </div>
       )}
 
@@ -930,28 +1251,55 @@ export default function AdminDashboard() {
                   <option value={0}>Nonaktif</option>
                 </select>
               </label>
-              <div>
-                <p className="modal-label-text">Gambar banner</p>
-                <div className="banner-upload-area">
-                  <label htmlFor="edit-banner-img-input" className="banner-upload-label">
-                    {editImagePreview ? (
-                      <img src={editImagePreview} alt="Preview baru" className="banner-img-preview" />
-                    ) : (
-                      <div className="banner-upload-placeholder" style={{ minHeight: '90px' }}>
-                        {editBanner.image ? (
-                          <img src={editBanner.image} alt={editBanner.title} style={{ maxHeight: '80px', objectFit: 'contain', borderRadius: '6px' }} />
-                        ) : <span className="banner-upload-icon">🖼️</span>}
-                        <span style={{ fontSize: '0.8rem' }}>Klik untuk ganti gambar</span>
-                      </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <p className="modal-label-text" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar Desktop</p>
+                  <div className="banner-upload-area">
+                    <label htmlFor="edit-banner-img-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                      {editImagePreview ? (
+                        <img src={editImagePreview} alt="Preview baru" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                      ) : (
+                        <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                          {editBanner.image ? (
+                            <img src={editBanner.image} alt={editBanner.title} style={{ maxHeight: '60px', objectFit: 'contain', borderRadius: '6px' }} />
+                          ) : <span className="banner-upload-icon" style={{ fontSize: 16 }}>🖥️</span>}
+                          <span style={{ fontSize: '0.75rem' }}>Ganti Desktop</span>
+                        </div>
+                      )}
+                    </label>
+                    <input ref={editFileInputRef} id="edit-banner-img-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImageChange} />
+                    {editImagePreview && (
+                      <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                        onClick={() => { setEditImagePreview(null); setEditImageFile(null); if (editFileInputRef.current) editFileInputRef.current.value = '' }}>
+                        Batal
+                      </button>
                     )}
-                  </label>
-                  <input ref={editFileInputRef} id="edit-banner-img-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImageChange} />
-                  {editImagePreview && (
-                    <button className="ghost-button" style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}
-                      onClick={() => { setEditImagePreview(null); setEditImageFile(null); if (editFileInputRef.current) editFileInputRef.current.value = '' }}>
-                      Batal ganti gambar
-                    </button>
-                  )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="modal-label-text" style={{ fontSize: 12, margin: '0 0 4px', fontWeight: 600 }}>Gambar HP (Opsional)</p>
+                  <div className="banner-upload-area">
+                    <label htmlFor="edit-banner-img-mobile-input" className="banner-upload-label" style={{ minHeight: '90px' }}>
+                      {editImageMobilePreview ? (
+                        <img src={editImageMobilePreview} alt="Preview baru" className="banner-img-preview" style={{ maxHeight: '80px' }} />
+                      ) : (
+                        <div className="banner-upload-placeholder" style={{ minHeight: '80px', padding: '10px 0' }}>
+                          {editBanner.image_mobile ? (
+                            <img src={editBanner.image_mobile} alt={editBanner.title} style={{ maxHeight: '60px', objectFit: 'contain', borderRadius: '6px' }} />
+                          ) : <span className="banner-upload-icon" style={{ fontSize: 16 }}>📱</span>}
+                          <span style={{ fontSize: '0.75rem' }}>Ganti Banner HP</span>
+                        </div>
+                      )}
+                    </label>
+                    <input ref={editFileInputMobileRef} id="edit-banner-img-mobile-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleEditImageMobileChange} />
+                    {editImageMobilePreview && (
+                      <button type="button" className="ghost-button" style={{ marginTop: '0.2rem', fontSize: '0.75rem', padding: '3px 6px' }}
+                        onClick={() => { setEditImageMobilePreview(null); setEditImageMobileFile(null); if (editFileInputMobileRef.current) editFileInputMobileRef.current.value = '' }}>
+                        Batal
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
               {editError && <p style={{ color: 'var(--red)', margin: 0, fontSize: '0.85rem' }}>{editError}</p>}

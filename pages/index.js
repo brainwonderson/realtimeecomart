@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { getStoredUserId } from '../lib/session'
 import SiteNav from '../components/SiteNav'
+import Footer from '../components/Footer'
 import { authJson } from '../lib/clientApi'
 import Head from 'next/head'
 
@@ -799,12 +800,18 @@ export default function Home() {
                   <div key={b.id} className="hero-slide-banner">
                     {b.link_url ? (
                       <a href={b.link_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }}>
-                        <img src={b.image} alt={b.title} />
+                        <picture style={{ display: 'block', width: '100%', height: '100%' }}>
+                          {b.image_mobile && <source media="(max-width: 640px)" srcSet={b.image_mobile} />}
+                          <img src={b.image} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </picture>
                         <div className="hero-banner-caption">{b.title}</div>
                       </a>
                     ) : (
                       <div style={{ width: '100%', height: '100%' }}>
-                        <img src={b.image} alt={b.title} />
+                        <picture style={{ display: 'block', width: '100%', height: '100%' }}>
+                          {b.image_mobile && <source media="(max-width: 640px)" srcSet={b.image_mobile} />}
+                          <img src={b.image} alt={b.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </picture>
                         <div className="hero-banner-caption">{b.title}</div>
                       </div>
                     )}
@@ -1122,33 +1129,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* ── CUSTOMER REVIEWS ── */}
-            <div className="reviews-section" aria-label="Ulasan pelanggan">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>Ulasan Pelanggan</span>
-                <Link href="#" className="section-hd-link">Lihat Semua</Link>
-              </div>
-              <div className="reviews-summary">
-                <div className="reviews-score">
-                  <div className="reviews-score-num">4.8</div>
-                  <div className="reviews-score-stars">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <span key={i} className={i < 5 ? 'star filled' : 'star'}>★</span>
-                    ))}
-                  </div>
-                  <div className="reviews-score-count">dari 25.000+ ulasan</div>
-                </div>
-                <div>
-                  <div className="reviews-avatars" aria-label="Beberapa reviewer">
-                    {['A','B','C','D','E'].map((l, i) => (
-                      <div key={i} className="review-avatar" style={{ background: `hsl(${i*60+200}, 70%, 50%)` }}>{l}</div>
-                    ))}
-                  </div>
-                  <p className="reviews-meta">Bergabung dengan 25.000+ pelanggan puas kami</p>
-                </div>
-              </div>
-            </div>
-
           </main>
         </div>
       )}
@@ -1316,6 +1296,7 @@ export default function Home() {
           <span className="chat-trigger-text">Chat</span>
         </button>
       </div>
+      <Footer />
     </div>
   )
 }
